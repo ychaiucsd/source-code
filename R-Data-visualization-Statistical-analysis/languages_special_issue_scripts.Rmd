@@ -39,11 +39,50 @@ suppressMessages(library(hqmisc))
 
 
 ## Citation tones
-### Combine data
+### Combine data and check pitch halving/doubling
 
-```{r echo = FALSE, results = "hide", message = FALSE}
+```{r}
 
-load("language_special_issue.RData")
+
+path = "F:/backup_07032021/Work/fieldwork_xiapu_summer2019/experiment/10_person_experiment/annotation/segment/word-tier/txt"
+setwd(path)
+
+df1 = read_csv("01_F.csv")
+df2 = read_csv("02_M.csv")
+df3 = read_csv("03_F.csv")
+df4 = read_csv("04_M.csv")
+df5 = read_csv("05_F.csv")
+df6 = read_csv("06_M.csv")
+df9 = read_csv("09_F.csv")
+df10 = read_csv("10_M.csv")
+
+df_segment = read_csv("E:/fieldwork_xiapu_summer2019/experiment/10_person_experiment/result/segment/individual_segment_dissertation_0428.csv")
+
+```
+
+
+## no use
+```{r eval = FALSE}
+
+# extract file numbers that have vowel /u/
+df_metau = df_segment %>% filter(vowel == "u")
+extention = c(".wav",".TextGrid")
+namelist.complete = c(outer(df_metau$filename, extention, FUN=paste0))
+df_vowelu = data.frame(filename = namelist.complete)
+write_csv(df_vowelu, "F:/backup_07032021/Work/fieldwork_xiapu_summer2019/experiment/10_person_experiment/annotation/segment/vowel_u_filename.txt")
+
+# used move.py to copy files. 
+# command: python move.py sourcedirectory destindirectory filename.txt
+
+```
+
+
+
+
+
+
+
+```{r}
 
 dfset = c("df1","df2", "df3","df4","df5","df6","df9","df10")
 
@@ -71,163 +110,131 @@ df.cite = df.cite %>%
   mutate(filen = as.numeric(filen)) %>%
   mutate(file_sub = paste(subject, filen,sep = "-"))
 
+# Only include target words in the stimuli
+df.cite.meta = left_join(df.cite, df_segment%>%dplyr::select(filen,vowel), by = "filen")
 
-df.full.cite = df.cite %>%
-  dplyr::select(Filename,segment,tone,environment,sandhi,rep, seg_Start,seg_End,t_ms,file_sub,
-                H1H2c,Energy,HNR05,strF0,soe,H1A3u,subject,duration,type,filen)%>%
-  dplyr::rename(h1h2c=H1H2c,hnr=HNR05,f0=strF0,energy=Energy,h1a3u=H1A3u)
+df.full.cite = df.cite.meta %>%
+  dplyr::select(Filename,segment,tone,environment,sandhi,rep,vowel,seg_Start,seg_End,t_ms,file_sub,
+                H1H2c,Energy,HNR05,strF0,pF1, pF2, soe,subject,duration,type,filen)%>%
+  dplyr::rename(h1h2c=H1H2c,hnr=HNR05,f0=strF0,energy=Energy,
+                f1 = pF1, f2 = pF2) %>%
+  mutate(logf0 = log10(f0))
 
 
 nrow(df.full.cite %>% filter(f0 == "NaN"))
 nrow(df.full.cite %>% filter(h1h2c == "NaN"))
-nrow(df.full.cite %>% filter(h1a3u == "NaN"))
 nrow(df.full.cite %>% filter(hnr == "NaN"))
 
 # filter out tokens where energy = 0 and log transform energy
 
   
-df.full.cite$f0[df.full.cite$energy == 0] <- "NA"
-df.full.cite$h1h2c[df.full.cite$energy == 0] <- "NA"
-df.full.cite$hnr[df.full.cite$energy == 0] <- "NA"
+df.full.cite$f0[df.full.cite$energy == 0] = NA
+df.full.cite$logf0[df.full.cite$energy == 0] = NA
+df.full.cite$h1h2c[df.full.cite$energy == 0] = NA
+df.full.cite$hnr[df.full.cite$energy == 0] = NA
+df.full.cite$f1[df.full.cite$energy == 0] = NA
+df.full.cite$f2[df.full.cite$energy == 0] = NA
   
 df.full.cite = df.full.cite %>%
   mutate(f0 = as.numeric(f0),
          h1h2c = as.numeric(h1h2c),
          hnr = as.numeric(hnr),
-         h1a3u = as.numeric(h1a3u))
-
-#f0 outlier
-df.full.cite$f0upper <- ave(df.full.cite$f0, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T) + 3 * sd(x, na.rm = T))
-df.full.cite$f0lower <- ave(df.full.cite$f0, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T) - 3 * sd(x, na.rm = T))
-df.full.cite$f0outlier[df.full.cite$f0 > df.full.cite$f0upper] <- "outlier"
-df.full.cite$f0outlier[df.full.cite$f0 < df.full.cite$f0lower] <- "outlier"
+         f1 = as.numeric(f1),
+         f2 = as.numeric(f2))
 
 
-
-
-
-#h1h2c outlier
-
-df.full.cite$h1h2c[df.full.cite$f0outlier == "outlier"] <- "NA"
-df.full.cite$h1h2c = as.numeric(df.full.cite$h1h2c)
-
-df.full.cite$h1h2cupper <- ave(df.full.cite$h1h2c, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T) + 3 * sd(x, na.rm = T))
-df.full.cite$h1h2clower <- ave(df.full.cite$h1h2c, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T) - 3 * sd(x, na.rm = T))
-df.full.cite$h1h2coutlier[df.full.cite$h1h2c > df.full.cite$h1h2cupper] <- "outlier"
-df.full.cite$h1h2coutlier[df.full.cite$h1h2c < df.full.cite$h1h2clower] <- "outlier"
-
-
-#h1a3u outlier
-
-df.full.cite$h1a3u[df.full.cite$f0outlier == "outlier"] <- "NA"
-df.full.cite$h1a3u = as.numeric(df.full.cite$h1a3u)
-
-df.full.cite$h1a3uupper <- ave(df.full.cite$h1a3u, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T) + 3 * sd(x, na.rm = T))
-df.full.cite$h1a3ulower <- ave(df.full.cite$h1a3u, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T) - 3 * sd(x, na.rm = T))
-df.full.cite$h1a3uoutlier[df.full.cite$h1a3u > df.full.cite$h1a3uupper] <- "outlier"
-df.full.cite$h1a3uoutlier[df.full.cite$h1a3u < df.full.cite$h1a3ulower] <- "outlier"
+# df4, 155, noisy, discard
+#df.full.cite = df.full.cite %>% filter(!(subject == "df4" & filen == "155" & vowel == "u"))
+# df5, 155, noisy, discard
+#df.full.cite = df.full.cite %>% filter(!(subject == "df5" & filen == "155" & vowel == "u"))
+# df2, 61, noisy, discard
+#df.full.cite = df.full.cite %>% filter(!(subject == "df2" & filen == "61" & vowel == "u"))
+# df4, 110, discard
+#df.full.cite = df.full.cite %>% filter(!(subject == "df4" & filen == "110" & vowel == "u"))
+# df4, 177, discard
+#df.full.cite = df.full.cite %>% filter(!(subject == "df4" & filen == "177" & vowel == "u"))
 
 
 
-
-<!-- #hnr outlier -->
-df.full.cite$hnrupper <- ave(df.full.cite$hnr, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T) + 3 * sd(x, na.rm = T))
-df.full.cite$hnrlower <- ave(df.full.cite$hnr, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T) - 3 * sd(x, na.rm = T))
-df.full.cite$hnroutlier[df.full.cite$hnr > df.full.cite$hnrupper] <- "outlier"
-df.full.cite$hnroutlier[df.full.cite$hnr < df.full.cite$hnrlower] <- "outlier"
-
-
-#write z score
-#F0
-df.full.cite$f0mean <- ave(df.full.cite$f0, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T))
-df.full.cite$f0sd <- ave(df.full.cite$f0, df.full.cite$subject, FUN = function(x) sd(x, na.rm = T))
-df.full.cite$f0z <- (df.full.cite$f0 - df.full.cite$f0mean) / df.full.cite$f0sd
-df.full.cite$f0z[df.full.cite$f0outlier == "outlier"] <- "NA"
-df.full.cite$f0[df.full.cite$f0outlier == "outlier"] <- "NA"
-
-
-#H1H2c
-
-
-df.full.cite$h1h2cmean <- ave(df.full.cite$h1h2c, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T))
-df.full.cite$h1h2csd <- ave(df.full.cite$h1h2c, df.full.cite$subject, FUN = function(x) sd(x, na.rm = T))
-df.full.cite$h1h2cz <- (df.full.cite$h1h2c - df.full.cite$h1h2cmean) / df.full.cite$h1h2csd
-df.full.cite$h1h2cz[df.full.cite$h1h2coutlier == "outlier"] <- "NA"
-df.full.cite$h1h2c[df.full.cite$h1h2c == "outlier"] <- "NA"
+```
 
 
 
+### havling/doubling check
 
-#h1a3u
+```{r}
 
+file = unique(df.full.cite$file_sub)
 
-df.full.cite$h1a3umean <- ave(df.full.cite$h1a3u, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T))
-df.full.cite$h1a3usd <- ave(df.full.cite$h1a3u, df.full.cite$subject, FUN = function(x) sd(x, na.rm = T))
-df.full.cite$h1a3uz <- (df.full.cite$h1a3u - df.full.cite$h1a3umean) / df.full.cite$h1a3usd
-df.full.cite$h1a3uz[df.full.cite$h1a3uoutlier == "outlier"] <- "NA"
-df.full.cite$h1a3u[df.full.cite$h1a3u == "outlier"] <- "NA"
+df.outlier = data.frame(filename=NA, f0=NA, time=NA, problem=NA)
 
 
-#hnr
-
-df.full.cite$hnrmean <- ave(df.full.cite$hnr, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T))
-df.full.cite$hnrsd <- ave(df.full.cite$hnr, df.full.cite$subject, FUN = function(x) sd(x, na.rm = T))
-df.full.cite$hnrz <- (df.full.cite$hnr - df.full.cite$hnrmean) / df.full.cite$hnrsd
-df.full.cite$hnrz[df.full.cite$hnroutlier == "outlier"] <- "NA"
-df.full.cite$hnr[df.full.cite$hnroutlier == "outlier"] <- "NA"
-
-
-
-#duration
-
-df.full.cite$durationmean <- ave(df.full.cite$duration, df.full.cite$subject, FUN = function(x) mean(x, na.rm = T))
-df.full.cite$durationsd <- ave(df.full.cite$duration, df.full.cite$subject, FUN = function(x) sd(x, na.rm = T))
-df.full.cite$durationz <- (df.full.cite$duration - df.full.cite$durationmean) / df.full.cite$durationsd
-
-
-
-
-df.full.cite <- df.full.cite %>%
-  mutate(f0z = as.numeric(f0z), 
-         h1h2cz = as.numeric(h1h2cz),
-         hnrz = as.numeric(hnrz),
-         t_ms = as.numeric(t_ms),
-         h1h2c = as.numeric(h1h2c),
-         durationz = as.numeric(durationz),
-         f0 = as.numeric(f0),
-         hnr = as.numeric(hnr),
-         h1a3u = as.numeric(h1a3u),
-         h1a3uz = as.numeric(h1a3uz))
+for (i in file) {
+  file.check = df.full.cite %>%
+    filter(file_sub == i)
+  for (j in 1:nrow(file.check)){
+    if (j < nrow(file.check)){
+      currentf0 = file.check$f0[j]
+      nextf0 = file.check$f0[j+1]
+      if (is.na(currentf0) || is.na(nextf0)){
+        print("na detected")
+      } else {
+        if (nextf0 <= 0.5 * currentf0) {
+          df.outlier[nrow(df.outlier)+1,] = c(file.check$file_sub[j], file.check$f0[j], file.check$t_ms[j], "halving")
+        print("halving")
+        } else if (nextf0 >= 2 * currentf0) {
+          df.outlier[nrow(df.outlier)+1,] = c(file.check$file_sub[j], file.check$f0[j], file.check$t_ms[j], "doubling")
+        print("doubling")
+        } 
+      }
+    }
+  } 
+}  
+```
 
 
-nrow(df.full.cite %>% filter(f0 == "NaN"))
-nrow(df.full.cite %>% filter(h1h2c == "NaN"))
-nrow(df.full.cite %>% filter(hnr == "NaN"))
-nrow(df.full.cite %>% filter(f0outlier == "outlier"))
-nrow(df.full.cite %>% filter(h1h2coutlier == "outlier"))
-nrow(df.full.cite %>% filter(hnroutlier == "outlier"))
+### Plot f0 track for t2 and 5
 
-nrow(df.full.cite %>% filter(!is.na(f0z)))
-nrow(df.full.cite %>% filter(!is.na(h1h2cz)))
-nrow(df.full.cite %>% filter(!is.na(hnrz)))
+```{r}
+length(levels(as.factor(df.full.cite$file_sub)))
 
-
-df0 = df.full.cite %>% filter(!is.na(f0z))
-dh1h2 = df.full.cite %>% filter(!is.na(h1h2cz))
-dhnr = df.full.cite %>% filter(!is.na(hnrz))
-
-length(unique(df0$file_sub))
-length(unique(dh1h2$file_sub))
-length(unique(dhnr$file_sub))
-
-
-
-
-#Divide into 9 intervals
 
 subjectset = levels(as.factor(df.full.cite$subject))
 
-dfsub.mean.cite = NULL
+for (i in subjectset) {
+  f0_track = df.full.cite %>%
+  filter(tone %in% c(2,5) & subject == i) %>%
+  ggplot(aes(x = t_ms, y = f0)) +
+  geom_line() +
+  facet_wrap(.~filen)+
+    xlab(i)
+  print(f0_track)
+}
+```
+
+
+### Exclude f0 tracking error
+```{r}
+
+df.full.cite = df.full.cite %>%
+  mutate(f0_trackerror = ifelse((subject == "df10" & filen %in% c(16, 65, 104)) |
+           (subject == "df2" & filen %in% c(31, 76)) |
+           (subject == "df3" & filen %in% c(29, 68)) |
+           (subject == "df4" & filen %in% c(8, 11, 12, 64, 73, 126)) |
+           (subject == "df5" & filen %in% c(28, 69, 76)), "error", NA))
+
+```
+
+
+
+# Make three point data file for detecting formant outlier
+
+
+```{r}
+
+subjectset = levels(as.factor(df.full.cite$subject))
+
+dfsub.mean.3p = NULL
 
 for (j in subjectset) {
   dfsub = df.full.cite %>%
@@ -236,6 +243,653 @@ for (j in subjectset) {
   for (i in nameset) {
     df.mean = dfsub %>%
       filter(Filename == i)
+    interval = round(quantile(c(1:nrow(df.mean)),c(1/3, 2/3, 1)),0)
+    
+
+    f1.mean1 = mean(df.mean$f1[1:interval[1]], na.rm = T)
+    f1.mean2 = mean(df.mean$f1[(interval[1]+1):interval[2]], na.rm = T)
+    f1.mean3 = mean(df.mean$f1[(interval[2]+1):interval[3]], na.rm = T)
+    
+    f2.mean1 = mean(df.mean$f2[1:interval[1]], na.rm = T)
+    f2.mean2 = mean(df.mean$f2[(interval[1]+1):interval[2]], na.rm = T)
+    f2.mean3 = mean(df.mean$f2[(interval[2]+1):interval[3]], na.rm = T)
+    
+   
+    
+    df.mean.sub = data.frame(
+                             f1 = c(f1.mean1, f1.mean2, f1.mean3),
+                             f2 = c(f2.mean1, f2.mean2, f2.mean3),
+                             subject = j, 
+                             filen = df.mean$filen[1],
+                             filename = df.mean$Filename[1],
+                             vowel = df.mean$vowel[1],
+                             tone = df.mean$tone[1],
+                             time = c(1:3),
+                             type = "cite")
+    dfsub.mean.3p = rbind(dfsub.mean.3p, df.mean.sub)
+  }
+}
+
+```
+
+
+
+
+## find out datapoint where there is formant outlier
+
+```{r}
+
+vmahalanobis = function (dat) {
+  if (nrow(dat) < 25) {
+    dat$zF1F2 = NA
+    return(dat)
+  }
+  means = c(mean(dat$f1), mean(dat$f2))
+  cov = cov(cbind(dat$f1, dat$f2))
+  
+  dat$zF1F2 = mahalanobis(cbind(dat$f1, dat$f2),
+                          center=means, cov=cov)
+  dat
+}
+
+distance_cutoff = 6
+
+dfsub.mean.3p.formantcheck = dfsub.mean.3p %>%
+  filter(time == 2) %>%
+  group_by(vowel) %>%
+  do(vmahalanobis(.)) %>%
+  ungroup() %>%
+  mutate(formant_outlier = NA)
+
+
+
+for (i in 1:nrow(dfsub.mean.3p.formantcheck)) {
+  if (dfsub.mean.3p.formantcheck$vowel[i] == "u" && dfsub.mean.3p.formantcheck$f2[i] > 1500) {
+    dfsub.mean.3p.formantcheck$formant_outlier[i] = "outlier"
+  } else if (!is.na(dfsub.mean.3p.formantcheck$zF1F2[i])) {
+        if (dfsub.mean.3p.formantcheck$zF1F2[i] > distance_cutoff){
+              dfsub.mean.3p.formantcheck$formant_outlier[i] = "outlier"
+        }
+  }
+}
+
+# visual inspection: df2, 57 outlier
+
+dfsub.mean.3p.formantcheck$formant_outlier[dfsub.mean.3p.formantcheck$subject == "df2" & dfsub.mean.3p.formantcheck$filen == 57 & dfsub.mean.3p.formantcheck$vowel == "y"] = "outlier"
+
+df.full.cite = left_join(df.full.cite, dfsub.mean.3p.formantcheck %>% dplyr::select(subject, filen, vowel, zF1F2, formant_outlier), by = c("subject","filen","vowel"))
+
+```
+
+
+
+
+### Detect f0, h1h2 and hnr outlier
+
+```{r echo = FALSE, results = "hide", message = FALSE}
+
+# when a tracking error detected for f0, exclude its f0 and h1h2 value
+df.full.cite$f0[df.full.cite$f0_trackerror == "error"] = NA
+df.full.cite$logf0[df.full.cite$f0_trackerror == "error"] = NA
+df.full.cite$h1h2c[df.full.cite$f0_trackerror == "error"] = NA
+
+
+# calculate f0 z score
+df.full.cite = df.full.cite %>% group_by(subject) %>%
+  mutate(f0z = (logf0 - mean(logf0, na.rm = T))/sd(logf0, na.rm = T)) %>%
+  ungroup()
+
+# if f0 z score larger than 3, exclude f0 and f0 z score, and h1h2
+df.full.cite$f0z[abs(df.full.cite$f0z[i]) > 3] = NA
+df.full.cite$f0[abs(df.full.cite$f0z[i]) > 3] = NA
+df.full.cite$logf0[abs(df.full.cite$f0z[i]) > 3] = NA
+df.full.cite$h1h2c[abs(df.full.cite$f0z[i]) > 3] = NA
+
+
+
+
+# if formant is outlier, exclude h1h2
+df.full.cite$h1h2c[df.full.cite$formant_outlier == "outlier"] = NA
+
+# calculate h1h2 and hnr z score
+df.full.cite = df.full.cite %>% group_by(subject) %>%
+  mutate(h1h2cz = (h1h2c - mean(h1h2c, na.rm = T))/sd(h1h2c, na.rm = T),
+         hnrz = (hnr - mean(hnr, na.rm = T))/sd(hnr, na.rm = T)) %>%
+  ungroup()
+
+# if h1h2 z score larger than 3, exclude h1h2 and h1h2 z score
+df.full.cite$h1h2c[df.full.cite$h1h2cz[i] > 3] = NA
+df.full.cite$h1h2cz[df.full.cite$h1h2cz[i] > 3] = NA
+
+# if hnr z score larger than 3, exclude hnr and hnr z score
+df.full.cite$hnr[df.full.cite$hnrz[i] > 3] = NA
+df.full.cite$hnrz[df.full.cite$hnrz[i] > 3] = NA
+
+
+# calculate duration z score. Note not to include repetitive duration data
+
+df.full.cite.unique = df.full.cite %>% dplyr::select(subject, filen, duration) %>% unique() %>%
+  group_by(subject) %>%
+  dplyr::mutate(durationmean = mean(duration, na.rm = T),
+                durationsd = sd(duration, na.rm = T),
+                durationz = (duration-durationmean)/durationsd) %>%
+  ungroup()
+df.full.cite = left_join(df.full.cite, df.full.cite.unique, by = c("subject","filen","duration"))
+
+
+
+# convert all values to numeric value
+df.full.cite <- df.full.cite %>%
+  mutate(f0z = as.numeric(f0z), 
+         h1h2cz = as.numeric(h1h2cz),
+         hnrz = as.numeric(hnrz),
+         t_ms = as.numeric(t_ms),
+         h1h2c = as.numeric(h1h2c),
+         durationz = as.numeric(durationz),
+         f0 = as.numeric(f0),
+         hnr = as.numeric(hnr))
+
+
+# check the number of NaN from the VS output; and the number of na due to outlier exclusion
+nrow(df.full.cite %>% filter(f0 == "NaN"))
+nrow(df.full.cite %>% filter(h1h2c == "NaN"))
+nrow(df.full.cite %>% filter(hnr == "NaN"))
+nrow(df.full.cite %>% filter(is.na(f0z)))
+nrow(df.full.cite %>% filter(is.na(h1h2cz)))
+nrow(df.full.cite %>% filter(is.na(hnrz)))
+
+
+
+df0 = df.full.cite %>% filter(!is.na(f0z))
+dh1h2 = df.full.cite %>% filter(!is.na(h1h2cz))
+dhnr = df.full.cite %>% filter(!is.na(hnrz))
+
+# check how many unique words there are for f0, h1h2, and hnr
+length(unique(df0$file_sub))
+length(unique(dh1h2$file_sub))
+length(unique(dhnr$file_sub))
+
+
+
+
+
+```
+
+
+
+## /u/ outlier
+
+```{r}
+
+View(dfsub.mean.cite.midformant.forplot %>%
+filter(vowel == "u" & check == "unchecked" & midf2 > 1500))
+
+#checked
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df1" & filen == "155" & vowel == "u"] = 344.373
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df1" & filen == "155" & vowel == "u"] = 758.075
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "34" & vowel == "u"] = 354.370
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "34" & vowel == "u"] = 671.630
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "7" & vowel == "u"] = 357.001
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "7" & vowel == "u"] = 672.870
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "34" & vowel == "u"] = 413.120
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "34" & vowel == "u"] = 827.156	
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "69" & vowel == "u"] = 314.808
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "69" & vowel == "u"] = 937.309
+
+# unchecked
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df1" & filen == "177" & vowel == "u"] = 413.396
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df1" & filen == "177" & vowel == "u"] = 702.407
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df1" & filen == "61" & vowel == "u"] = 333.362
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df1" & filen == "61" & vowel == "u"] = 789.168
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "112" & vowel == "u"] = 400.244
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "112" & vowel == "u"] = 640.691
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "114" & vowel == "u"] = 393.152
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "114" & vowel == "u"] = 671.854
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "177" & vowel == "u"] = 411.000
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "177" & vowel == "u"] = 625.792
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "30" & vowel == "u"] = 389.626
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "30" & vowel == "u"] = 609.889
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "40" & vowel == "u"] = 364.972
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df10" & filen == "40" & vowel == "u"] = 617.132
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "110" & vowel == "u"] = 334.961
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "110" & vowel == "u"] = 662.305
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "30" & vowel == "u"] = 336.052
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "30" & vowel == "u"] = 560.127
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "40" & vowel == "u"] = 353.710
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "40" & vowel == "u"] = 604.304
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "4" & vowel == "u"] = 309.531
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "4" & vowel == "u"] = 589.378
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "6" & vowel == "u"] = 330.370
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df2" & filen == "6" & vowel == "u"] = 598.174 
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df3" & filen == "177" & vowel == "u"] = 311.732
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df3" & filen == "177" & vowel == "u"] = 695.975 
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "112" & vowel == "u"] = 278.136
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "112" & vowel == "u"] = 665.158 
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "30" & vowel == "u"] = 287.596
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "30" & vowel == "u"] = 641.504 
+
+dfsub.mean.cite.midformant.forplot$midf1[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "40" & vowel == "u"] = 274.041
+dfsub.mean.cite.midformant.forplot$midf2[dfsub.mean.cite.midformant.forplot$subject == "df4" & filen == "40" & vowel == "u"] = 634.460 
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+### Prepare sandhi data
+
+```{r}
+
+path = "F:/backup_07032021/Work/fieldwork_xiapu_summer2019/experiment/10_person_experiment/annotation/neutralization/word-tier/txt"
+setwd(path)
+
+df1 = read_csv("01_F.csv")
+df2 = read_csv("02_M.csv")
+df3 = read_csv("03_F.csv")
+df4 = read_csv("04_M.csv")
+df5 = read_csv("05_F.csv")
+df6 = read_csv("06_M.csv")
+df8 = read_csv("08_M.csv")
+df9 = read_csv("09_F.csv")
+df10 = read_csv("10_M.csv")
+df11 = read_csv("11_F.csv")
+
+
+dfset = c("df1","df2", "df3","df4","df5","df6","df8","df9","df10","df11")
+df_meta = read_csv("E:/fieldwork_xiapu_summer2019/experiment/10_person_experiment/result/data-new/sandhi_metadata_languages_110821.csv")
+
+```
+
+
+## no use
+```{r eval = FALSE}
+# for copy files with /u/ vowel
+
+df_meta_u = df_meta %>% filter(vowel == "u")
+ablist = c("A.wav","B.wav", "A.TextGrid","B.TextGrid")
+namelist.complete = c(outer(df_meta_u$filen, ablist, FUN=paste0))
+df_vowelu = data.frame(filename = namelist.complete)
+write_csv(df_vowelu, "F:/backup_07032021/Work/fieldwork_xiapu_summer2019/experiment/10_person_experiment/annotation/neutralization/word-tier/vowel_u_sandhi_filename.txt")
+
+```
+
+
+```{r}
+
+df.sandhi = NULL
+for (i in dfset) {
+  j = get(i)
+  j = j %>%
+    mutate(subject = i)
+  df.sandhi = rbind(df.sandhi, j)
+  
+}
+
+
+df.sandhi = df.sandhi %>%
+  mutate(duration = seg_End - seg_Start) %>%
+  filter(!str_detect(Filename, "clip|corrupt|Clip"))
+df.sandhi$filen = str_sub(df.sandhi$Filename,1,-6)
+
+
+df.sandhi = df.sandhi %>%
+  mutate(filen = as.numeric(filen)) %>%
+  filter(filen %in% df_meta$filen) %>%
+  mutate(filen = as.numeric(filen)) %>%
+  mutate(file_sub = paste(subject, Filename,sep = "-"))
+
+length(unique(df.sandhi$file_sub))  
+df.sandhi.meta = left_join(df.sandhi, df_meta%>%dplyr::select(filen,vowel), by = "filen")
+
+# length(unique(df.sandhi$filen))
+
+
+df.full.sandhi = df.sandhi.meta %>%
+  dplyr::select(Filename,segment,tone,environment,sandhi,rep,seg_Start,seg_End,t_ms,file_sub,
+                H1H2c,Energy,HNR05,strF0,pF1, pF2, soe,subject,duration,filen,vowel)%>%
+  dplyr::rename(h1h2c=H1H2c,hnr=HNR05,f0=strF0,energy=Energy,f1=pF1,f2=pF2) %>%
+  mutate(logf0 = log10(f0))
+
+
+nrow(df.full.sandhi %>% filter(f0 == "NaN"))
+nrow(df.full.sandhi %>% filter(h1h2c == "NaN"))
+nrow(df.full.sandhi %>% filter(hnr == "NaN"))
+
+# filter out tokens where energy = 0 and log transform energy
+nrow(df.full.sandhi %>% filter(energy == 0))
+  
+df.full.sandhi$f0[df.full.sandhi$energy == 0] <- NA
+df.full.sandhi$logf0[df.full.sandhi$energy == 0] <- NA
+df.full.sandhi$h1h2c[df.full.sandhi$energy == 0] <- NA
+df.full.sandhi$hnr[df.full.sandhi$energy == 0] <- NA
+  
+df.full.sandhi = df.full.sandhi %>%
+  mutate(f0 = as.numeric(f0),
+         h1h2c = as.numeric(h1h2c),
+         hnr = as.numeric(hnr))
+
+```
+
+
+
+
+### Draw f0 track for 2 and 5 to spot tracking error
+```{r}
+
+
+length(levels(as.factor(df.full.sandhi$file_sub)))
+
+
+subjectset = levels(as.factor(df.full.sandhi$subject))
+
+for (i in subjectset) {
+  f0_track = df.full.sandhi %>%
+  filter(tone %in% c(2,5) & subject == i) %>%
+  ggplot(aes(x = t_ms, y = f0)) +
+  geom_line() +
+  facet_wrap(.~Filename)+
+    xlab(i)
+  print(f0_track)
+}
+```
+
+
+### Exclude f0 track error
+```{r}
+
+df.full.sandhi = df.full.sandhi %>%
+  mutate(f0_trackerror = ifelse(subject == "df5" & Filename == "29A.mat", "error", NA))
+
+```
+
+
+
+### havling/doubling check
+
+```{r}
+
+file = unique(df.full.sandhi$file_sub)
+
+df.outlier = data.frame(filename=NA, f0=NA, time=NA, problem=NA)
+
+
+for (i in file) {
+  file.check = df.full.sandhi %>%
+    filter(file_sub == i)
+  for (j in 1:nrow(file.check)){
+    if (j < nrow(file.check)){
+      currentf0 = file.check$f0[j]
+      nextf0 = file.check$f0[j+1]
+      if (is.na(currentf0) || is.na(nextf0)){
+        print("na detected")
+      } else {
+        if (nextf0 <= 0.5 * currentf0) {
+          df.outlier[nrow(df.outlier)+1,] = c(file.check$file_sub[j], file.check$f0[j], file.check$t_ms[j], "halving")
+        print("halving")
+        } else if (nextf0 >= 2 * currentf0) {
+          df.outlier[nrow(df.outlier)+1,] = c(file.check$file_sub[j], file.check$f0[j], file.check$t_ms[j], "doubling")
+        print("doubling")
+        } 
+      }
+    }
+  } 
+}  
+```
+
+
+
+# Make three point data file for detecting formant outlier
+
+
+```{r}
+
+subjectset = levels(as.factor(df.full.sandhi$subject))
+
+dfsub.mean.3p = NULL
+
+for (j in subjectset) {
+  dfsub = df.full.sandhi %>%
+    filter(subject == j)
+  nameset = unique(droplevels(dfsub)$Filename)
+  for (i in nameset) {
+    df.mean = dfsub %>%
+      filter(Filename == i)
+    interval = round(quantile(c(1:nrow(df.mean)),c(1/3, 2/3, 1)),0)
+    
+
+    f1.mean1 = mean(df.mean$f1[1:interval[1]], na.rm = T)
+    f1.mean2 = mean(df.mean$f1[(interval[1]+1):interval[2]], na.rm = T)
+    f1.mean3 = mean(df.mean$f1[(interval[2]+1):interval[3]], na.rm = T)
+    
+    f2.mean1 = mean(df.mean$f2[1:interval[1]], na.rm = T)
+    f2.mean2 = mean(df.mean$f2[(interval[1]+1):interval[2]], na.rm = T)
+    f2.mean3 = mean(df.mean$f2[(interval[2]+1):interval[3]], na.rm = T)
+    
+   
+    
+    df.mean.sub = data.frame(
+                             f1 = c(f1.mean1, f1.mean2, f1.mean3),
+                             f2 = c(f2.mean1, f2.mean2, f2.mean3),
+                             subject = j, 
+                             filen = df.mean$filen[1],
+                             filename = df.mean$Filename[1],
+                             vowel = df.mean$vowel[1],
+                             tone = df.mean$tone[1],
+                             time = c(1:3),
+                             type = "sandhi")
+    dfsub.mean.3p = rbind(dfsub.mean.3p, df.mean.sub)
+  }
+}
+
+```
+
+## find out datapoint where there is formant outlier
+
+```{r}
+
+vmahalanobis = function (dat) {
+  if (nrow(dat) < 25) {
+    dat$zF1F2 = NA
+    return(dat)
+  }
+  means = c(mean(dat$f1), mean(dat$f2))
+  cov = cov(cbind(dat$f1, dat$f2))
+  
+  dat$zF1F2 = mahalanobis(cbind(dat$f1, dat$f2),
+                          center=means, cov=cov)
+  dat
+}
+
+distance_cutoff = 6
+
+dfsub.mean.3p.formantcheck = dfsub.mean.3p %>%
+  filter(time == 2) %>%
+  group_by(vowel) %>%
+  do(vmahalanobis(.)) %>%
+  ungroup() %>%
+  mutate(formant_outlier = NA)
+
+# visualize the vowel formant
+dfsub.mean.3p.formantcheck %>% 
+  filter(is.na(formant_outlier)) %>%
+  ggplot(aes(x = f2, y = f1, color = zF1F2 > distance_cutoff)) +
+  geom_point(size = 0.6) +
+  #geom_text()+
+  facet_wrap(.~vowel)+
+  #geom_density_2d() +
+#  scale_color_manual(values=c('#a6611a','#dfc27d','#018571'))+
+  scale_y_reverse(limits = c(1500,0),position = "right") + 
+  scale_x_reverse(limits = c(3500,0),position = "top")+
+  theme_bw()
+  
+
+for (i in 1:nrow(dfsub.mean.3p.formantcheck)) {
+  if (dfsub.mean.3p.formantcheck$vowel[i] == "u" && dfsub.mean.3p.formantcheck$f2[i] > 1500) {
+    dfsub.mean.3p.formantcheck$formant_outlier[i] = "outlier"
+  } else if (!is.na(dfsub.mean.3p.formantcheck$zF1F2[i])) {
+        if (dfsub.mean.3p.formantcheck$zF1F2[i] > distance_cutoff){
+              dfsub.mean.3p.formantcheck$formant_outlier[i] = "outlier"
+        }
+  }
+}
+
+# visual inspection: df2, 57 outlier
+
+df.full.sandhi = left_join(df.full.sandhi, dfsub.mean.3p.formantcheck %>% dplyr::select(subject, filen, vowel, zF1F2, formant_outlier), by = c("subject","filen","vowel"))
+
+```
+
+### Visual inspection for /u/
+
+```{r eval = F}
+View(dfsub.mean.3p.formantcheck %>% filter(vowel == "u" & f2 > 1500))
+```
+
+
+
+### Detect f0, h1h2 and hnr outlier
+
+```{r echo = FALSE, results = "hide", message = FALSE}
+
+# if f0 has track error, exclude f0 and h1h2
+
+df.full.sandhi$f0[df.full.sandhi$f0_trackerror == "error"] = NA
+df.full.sandhi$logf0[df.full.sandhi$f0_trackerror == "error"] = NA
+df.full.sandhi$h1h2c[df.full.sandhi$f0_trackerror == "error"] = NA
+
+
+# calculate f0 z score
+df.full.sandhi = df.full.sandhi %>% group_by(subject) %>%
+  mutate(f0z = logf0 - mean(logf0, na.rm = T)/sd(logf0, na.rm = T)) %>%
+  ungroup()
+
+# if f0 z score larger than 3, exclude f0 and f0 z score, and h1h2
+df.full.sandhi$f0z[df.full.sandhi$f0z[i] > 3] = NA
+df.full.sandhi$f0[df.full.sandhi$f0z[i] > 3] = NA
+df.full.sandhi$logf0[df.full.sandhi$f0z[i] > 3] = NA
+df.full.sandhi$h1h2c[df.full.sandhi$f0z[i] > 3] = NA
+
+# if formant is outlier, exclude h1h2
+df.full.sandhi$h1h2c[df.full.sandhi$formant_outlier == "outlier"] = NA
+
+# calculate h1h2 and hnr z score
+df.full.sandhi = df.full.sandhi %>% group_by(subject) %>%
+  mutate(h1h2cz = (h1h2c - mean(h1h2c, na.rm = T))/sd(h1h2c, na.rm = T),
+         hnrz = (hnr - mean(hnr, na.rm = T))/sd(hnr, na.rm = T)) %>%
+  ungroup()
+
+# if h1h2 z score larger than 3, exclude h1h2 and h1h2 z score
+df.full.sandhi$h1h2c[df.full.sandhi$h1h2cz[i] > 3] = NA
+df.full.sandhi$h1h2cz[df.full.sandhi$h1h2cz[i] > 3] = NA
+
+# if hnr z score larger than 3, exclude hnr and hnr z score
+df.full.sandhi$hnr[df.full.sandhi$hnrz[i] > 3] = NA
+df.full.sandhi$hnrz[df.full.sandhi$hnrz[i] > 3] = NA
+
+
+# calculate duration z score. Note not to include repetitive duration data
+
+df.full.sandhi.unique = df.full.sandhi %>% dplyr::select(subject, filen, duration) %>% unique() %>%
+  group_by(subject) %>%
+  dplyr::mutate(durationmean = mean(duration, na.rm = T),
+                durationsd = sd(duration, na.rm = T),
+                durationz = (duration-durationmean)/durationsd) %>%
+  ungroup()
+df.full.sandhi = left_join(df.full.sandhi, df.full.sandhi.unique, by = c("subject","filen","duration"))
+
+
+
+# convert all values to numeric value
+df.full.sandhi <- df.full.sandhi %>%
+  mutate(f0z = as.numeric(f0z), 
+         h1h2cz = as.numeric(h1h2cz),
+         hnrz = as.numeric(hnrz),
+         t_ms = as.numeric(t_ms),
+         h1h2c = as.numeric(h1h2c),
+         durationz = as.numeric(durationz),
+         f0 = as.numeric(f0),
+         hnr = as.numeric(hnr))
+
+
+# check the number of NaN from the VS output; and the number of na due to outlier exclusion
+nrow(df.full.sandhi %>% filter(f0 == "NaN"))
+nrow(df.full.sandhi %>% filter(h1h2c == "NaN"))
+nrow(df.full.sandhi %>% filter(hnr == "NaN"))
+nrow(df.full.sandhi %>% filter(is.na(f0z)))
+nrow(df.full.sandhi %>% filter(is.na(h1h2cz)))
+nrow(df.full.sandhi %>% filter(is.na(hnrz)))
+
+
+
+df0 = df.full.sandhi %>% filter(!is.na(f0z))
+dh1h2 = df.full.sandhi %>% filter(!is.na(h1h2cz))
+dhnr = df.full.sandhi %>% filter(!is.na(hnrz))
+
+# check how many unique words there are for f0, h1h2, and hnr
+length(unique(df0$file_sub))
+length(unique(dh1h2$file_sub))
+length(unique(dhnr$file_sub))
+
+
+
+
+
+```
+
+
+
+### Make 9-point version
+
+```{r}
+
+df.full.cite = df.full.cite %>%
+                  mutate(type = "cite")
+df.full.sandhi = df.full.sandhi %>%
+                  mutate(type = "sandhi")
+df.full = rbind(df.full.cite, df.full.sandhi) %>%
+            mutate(fileunique = paste(Filename, type, sep = "-"))
+            
+            
+subjectset = levels(as.factor(df.full$subject))
+
+df.9p = NULL
+
+for (j in subjectset) {
+  dfsub = df.full %>%
+    filter(subject == j)
+  nameset = unique(droplevels(dfsub)$fileunique)
+  for (i in nameset) {
+    df.mean = dfsub %>%
+      filter(fileunique == i)
     interval = round(quantile(c(1:nrow(df.mean)),c(1/9, 2/9, 3/9, 4/9, 5/9, 6/9, 7/9, 8/9, 1)),0)
     
     f0.mean1 = mean(df.mean$f0[1:interval[1]], na.rm = T)
@@ -247,6 +901,16 @@ for (j in subjectset) {
     f0.mean7 = mean(df.mean$f0[(interval[6]+1):interval[7]], na.rm = T)
     f0.mean8 = mean(df.mean$f0[(interval[7]+1):interval[8]], na.rm = T)
     f0.mean9 = mean(df.mean$f0[(interval[8]+1):interval[9]], na.rm = T)
+
+    logf0.mean1 = mean(df.mean$logf0[1:interval[1]], na.rm = T)
+    logf0.mean2 = mean(df.mean$logf0[(interval[1]+1):interval[2]], na.rm = T)
+    logf0.mean3 = mean(df.mean$logf0[(interval[2]+1):interval[3]], na.rm = T)
+    logf0.mean4 = mean(df.mean$logf0[(interval[3]+1):interval[4]], na.rm = T)
+    logf0.mean5 = mean(df.mean$logf0[(interval[4]+1):interval[5]], na.rm = T)
+    logf0.mean6 = mean(df.mean$logf0[(interval[5]+1):interval[6]], na.rm = T)
+    logf0.mean7 = mean(df.mean$logf0[(interval[6]+1):interval[7]], na.rm = T)
+    logf0.mean8 = mean(df.mean$logf0[(interval[7]+1):interval[8]], na.rm = T)
+    logf0.mean9 = mean(df.mean$logf0[(interval[8]+1):interval[9]], na.rm = T)
     
     h1h2.mean1 = mean(df.mean$h1h2c[1:interval[1]], na.rm = T)
     h1h2.mean2 = mean(df.mean$h1h2c[(interval[1]+1):interval[2]], na.rm = T)
@@ -257,23 +921,6 @@ for (j in subjectset) {
     h1h2.mean7 = mean(df.mean$h1h2c[(interval[6]+1):interval[7]], na.rm = T)
     h1h2.mean8 = mean(df.mean$h1h2c[(interval[7]+1):interval[8]], na.rm = T)
     h1h2.mean9 = mean(df.mean$h1h2c[(interval[8]+1):interval[9]], na.rm = T)
-
-
-    
-    h1a3u.mean1 = mean(df.mean$h1a3u[1:interval[1]], na.rm = T)
-    h1a3u.mean2 = mean(df.mean$h1a3u[(interval[1]+1):interval[2]], na.rm = T)
-    h1a3u.mean3 = mean(df.mean$h1a3u[(interval[2]+1):interval[3]], na.rm = T)
-    h1a3u.mean4 = mean(df.mean$h1a3u[(interval[3]+1):interval[4]], na.rm = T)
-    h1a3u.mean5 = mean(df.mean$h1a3u[(interval[4]+1):interval[5]], na.rm = T)
-    h1a3u.mean6 = mean(df.mean$h1a3u[(interval[5]+1):interval[6]], na.rm = T)
-    h1a3u.mean7 = mean(df.mean$h1a3u[(interval[6]+1):interval[7]], na.rm = T)
-    h1a3u.mean8 = mean(df.mean$h1a3u[(interval[7]+1):interval[8]], na.rm = T)
-    h1a3u.mean9 = mean(df.mean$h1a3u[(interval[8]+1):interval[9]], na.rm = T)
-    
-
-
-
-
     
     hnr.mean1 = mean(df.mean$hnr[1:interval[1]], na.rm = T)
     hnr.mean2 = mean(df.mean$hnr[(interval[1]+1):interval[2]], na.rm = T)
@@ -317,18 +964,6 @@ for (j in subjectset) {
     h1h2.mean.z9 = mean(df.mean$h1h2cz[(interval[8]+1):interval[9]], na.rm = T)
     
     
-    
-    h1a3u.mean.z1 = mean(df.mean$h1a3uz[1:interval[1]], na.rm = T)
-    h1a3u.mean.z2 = mean(df.mean$h1a3uz[(interval[1]+1):interval[2]], na.rm = T)
-    h1a3u.mean.z3 = mean(df.mean$h1a3uz[(interval[2]+1):interval[3]], na.rm = T)
-    h1a3u.mean.z4 = mean(df.mean$h1a3uz[(interval[3]+1):interval[4]], na.rm = T)
-    h1a3u.mean.z5 = mean(df.mean$h1a3uz[(interval[4]+1):interval[5]], na.rm = T)
-    h1a3u.mean.z6 = mean(df.mean$h1a3uz[(interval[5]+1):interval[6]], na.rm = T)
-    h1a3u.mean.z7 = mean(df.mean$h1a3uz[(interval[6]+1):interval[7]], na.rm = T)
-    h1a3u.mean.z8 = mean(df.mean$h1a3uz[(interval[7]+1):interval[8]], na.rm = T)
-    h1a3u.mean.z9 = mean(df.mean$h1a3uz[(interval[8]+1):interval[9]], na.rm = T)
-    
-    
     hnr.mean.z1 = mean(df.mean$hnrz[1:interval[1]], na.rm = T)
     hnr.mean.z2 = mean(df.mean$hnrz[(interval[1]+1):interval[2]], na.rm = T)
     hnr.mean.z3 = mean(df.mean$hnrz[(interval[2]+1):interval[3]], na.rm = T)
@@ -342,77 +977,237 @@ for (j in subjectset) {
     
     
     
-    df.mean.sub = data.frame(f0z = c(f0.mean.z1, f0.mean.z2, f0.mean.z3,
-                                     f0.mean.z4, f0.mean.z5, f0.mean.z6,
+    df.mean.sub = data.frame(f0z = c(f0.mean.z1, f0.mean.z2, f0.mean.z3, 
+                                     f0.mean.z4, f0.mean.z5,f0.mean.z6,
                                      f0.mean.z7, f0.mean.z8, f0.mean.z9),
+                             
+                             hnr = c(h1h2.mean1, h1h2.mean2, h1h2.mean3,
+                                     h1h2.mean4, h1h2.mean5, h1h2.mean6,
+                                     h1h2.mean7, h1h2.mean8, h1h2.mean9),
                              hnrz = c(hnr.mean.z1, hnr.mean.z2, hnr.mean.z3,
-                                     hnr.mean.z4, hnr.mean.z5, hnr.mean.z6,
-                                     hnr.mean.z7, hnr.mean.z8, hnr.mean.z9),
+                                      hnr.mean.z4, hnr.mean.z5, hnr.mean.z6,
+                                      hnr.mean.z7, hnr.mean.z8, hnr.mean.z9),
                              f0 = c(f0.mean1, f0.mean2, f0.mean3,
                                     f0.mean4, f0.mean5, f0.mean6,
                                     f0.mean7, f0.mean8, f0.mean9),
+                             logf0 = c(logf0.mean1, logf0.mean2, logf0.mean3,
+                                    logf0.mean4, logf0.mean5, logf0.mean6,
+                                    logf0.mean7, logf0.mean8, logf0.mean9),
+                             h1h2c = c(h1h2.mean1, h1h2.mean2, h1h2.mean3,
+                                       h1h2.mean4, h1h2.mean5, h1h2.mean6,
+                                       h1h2.mean7, h1h2.mean8, h1h2.mean9),
                              h1h2cz = c(h1h2.mean.z1, h1h2.mean.z2, h1h2.mean.z3,
                                         h1h2.mean.z4, h1h2.mean.z5, h1h2.mean.z6,
                                         h1h2.mean.z7, h1h2.mean.z8, h1h2.mean.z9),
-                             h1h2c = c(h1h2.mean1, h1h2.mean2, h1h2.mean3,
-                                        h1h2.mean4, h1h2.mean5, h1h2.mean6,
-                                        h1h2.mean7, h1h2.mean8, h1h2.mean9),
-
-                             h1a3uz = c(h1a3u.mean.z1, h1a3u.mean.z2, h1a3u.mean.z3,
-                                        h1a3u.mean.z4, h1a3u.mean.z5, h1a3u.mean.z6,
-                                        h1a3u.mean.z7, h1a3u.mean.z8, h1a3u.mean.z9),
-                             h1a3u = c(h1a3u.mean1, h1a3u.mean2, h1a3u.mean3,
-                                        h1a3u.mean4, h1a3u.mean5, h1a3u.mean6,
-                                        h1a3u.mean7, h1a3u.mean8, h1a3u.mean9),
-                                        
-                             hnr = c(hnr.mean1, hnr.mean2, hnr.mean3,
-                                     hnr.mean4, hnr.mean5, hnr.mean6,
-                                     hnr.mean7, hnr.mean8, hnr.mean9),
                              durationz = df.mean$durationz[1],
                              duration = df.mean$duration[1],
                              subject = j, 
-                             filen = str_sub(df.mean$Filename[1],1,-6),
+                             filen = str_sub(df.mean$filen[1]),
                              filename = df.mean$Filename[1],
                              tone = df.mean$tone[1],
                              time = c(1:9),
-                             type = "cite")
-    dfsub.mean.cite = rbind(dfsub.mean.cite, df.mean.sub)
+                             type = df.mean$type[1],
+                             fileunique = i,
+                             formant_outlier = df.mean$formant_outlier[1],
+                             f0_trackerror = df.mean$f0_trackerror[1])
+    df.9p = rbind(df.9p, df.mean.sub)
+  }
+}
+
+```
+
+
+
+
+### Make 3-point version
+
+```{r}
+            
+
+df.full.cite = df.full.cite %>%
+                  mutate(type = "cite")
+df.full.sandhi = df.full.sandhi %>%
+                  mutate(type = "sandhi")
+df.full = rbind(df.full.cite, df.full.sandhi) %>%
+            mutate(fileunique = paste(Filename, type, sep = "-"))
+            
+            
+subjectset = levels(as.factor(df.full$subject))
+
+df.3p = NULL
+
+for (j in subjectset) {
+  dfsub = df.full %>%
+    filter(subject == j)
+  nameset = unique(droplevels(dfsub)$fileunique)
+  for (i in nameset) {
+    df.mean = dfsub %>%
+      filter(fileunique == i)
+    interval = round(quantile(c(1:nrow(df.mean)),c(1/3, 2/3, 1)),0)
+    
+    f0.mean1 = mean(df.mean$f0[1:interval[1]], na.rm = T)
+    f0.mean2 = mean(df.mean$f0[(interval[1]+1):interval[2]], na.rm = T)
+    f0.mean3 = mean(df.mean$f0[(interval[2]+1):interval[3]], na.rm = T)
+
+    logf0.mean1 = mean(df.mean$logf0[1:interval[1]], na.rm = T)
+    logf0.mean2 = mean(df.mean$logf0[(interval[1]+1):interval[2]], na.rm = T)
+    logf0.mean3 = mean(df.mean$logf0[(interval[2]+1):interval[3]], na.rm = T)
+
+        
+    h1h2.mean1 = mean(df.mean$h1h2c[1:interval[1]], na.rm = T)
+    h1h2.mean2 = mean(df.mean$h1h2c[(interval[1]+1):interval[2]], na.rm = T)
+    h1h2.mean3 = mean(df.mean$h1h2c[(interval[2]+1):interval[3]], na.rm = T)
+    
+    hnr.mean1 = mean(df.mean$hnr[1:interval[1]], na.rm = T)
+    hnr.mean2 = mean(df.mean$hnr[(interval[1]+1):interval[2]], na.rm = T)
+    hnr.mean3 = mean(df.mean$hnr[(interval[2]+1):interval[3]], na.rm = T)
+    
+    
+    energy.mean1 = mean(df.mean$energy[1:interval[1]], na.rm = T)
+    energy.mean2 = mean(df.mean$energy[(interval[1]+1):interval[2]], na.rm = T)
+    energy.mean3 = mean(df.mean$energy[(interval[2]+1):interval[3]], na.rm = T)
+    
+    f0.mean.z1 = mean(df.mean$f0z[1:interval[1]], na.rm = T)
+    f0.mean.z2 = mean(df.mean$f0z[(interval[1]+1):interval[2]], na.rm = T)
+    f0.mean.z3 = mean(df.mean$f0z[(interval[2]+1):interval[3]], na.rm = T)
+    
+    h1h2.mean.z1 = mean(df.mean$h1h2cz[1:interval[1]], na.rm = T)
+    h1h2.mean.z2 = mean(df.mean$h1h2cz[(interval[1]+1):interval[2]], na.rm = T)
+    h1h2.mean.z3 = mean(df.mean$h1h2cz[(interval[2]+1):interval[3]], na.rm = T)
+    
+    
+    hnr.mean.z1 = mean(df.mean$hnrz[1:interval[1]], na.rm = T)
+    hnr.mean.z2 = mean(df.mean$hnrz[(interval[1]+1):interval[2]], na.rm = T)
+    hnr.mean.z3 = mean(df.mean$hnrz[(interval[2]+1):interval[3]], na.rm = T)
+    
+    
+    
+    
+    df.mean.sub = data.frame(f0z = c(f0.mean.z1, f0.mean.z2, f0.mean.z3),
+                             hnrz = c(hnr.mean.z1, hnr.mean.z2, hnr.mean.z3),
+                             f0 = c(f0.mean1, f0.mean2, f0.mean3),
+                             logf0 = c(logf0.mean1, logf0.mean2, logf0.mean3),
+                             h1h2cz = c(h1h2.mean.z1, h1h2.mean.z2, h1h2.mean.z3),
+                             durationz = df.mean$durationz[1],
+                             subject = j, 
+                             filen = str_sub(df.mean$filen[1]),
+                             filename = df.mean$Filename[1],
+                             tone = df.mean$tone[1],
+                             time = c(1:3),
+                             type = df.mean$type[1],
+                             fileunique = i,
+                             formant_outlier = df.mean$formant_outlier[1],
+                             f0_trackerror = df.mean$f0_trackerror[1])
+    df.3p = rbind(df.3p, df.mean.sub)
   }
 }
 
 
-df.female = dfsub.mean.cite %>% filter(subject %in% c("df1") & filen %in% c("22", "62", "8", "24", "156"))
+nrow(df.3p %>% filter(!is.na(f0z) & type == "sandhi"))
+nrow(df.3p %>% filter(!is.na(h1h2cz) & type == "sandhi"))
+nrow(df.3p %>% filter(!is.na(hnrz) & type == "sandhi"))
 
 
-#View(df.female %>% group_by(time, filen, tone) %>% 
-#  summarize(mean.f0 = mean(f0, na.rm = T),
-#            mean.duration = mean(duration, na.rm = T)))
 
 
-df.male = dfsub.mean.cite %>% filter(subject %in% c("df2", "df4", "df6", "df8", "df10") & filen %in% c("22", "62", "8", "24", "156"))
+# 3p wide version
 
 
-#View(df.male %>% group_by(time, filen) %>% 
-#  summarize(mean.f0 = mean(f0, na.rm = T),
-#            mean.duration = mean(duration, na.rm = T)))
+df.3p.wide = NULL
 
-#nrow(dfsub.mean.cite %>% filter(!is.na(f0z)))
-#nrow(dfsub.mean.cite %>% filter(!is.na(h1h2cz)))
-#nrow(dfsub.mean.cite %>% filter(!is.na(hnrz)))
+for (j in subjectset) {
+  dfsub = df.full %>%
+    filter(subject == j)
+  nameset = unique(droplevels(dfsub)$fileunique)
+  for (i in nameset) {
+    df.mean = dfsub %>%
+      filter(fileunique == i)
+    interval = round(quantile(c(1:nrow(df.mean)),c(1/3, 2/3, 1)),0)
+    
+    f0.mean1 = mean(df.mean$f0[1:interval[1]], na.rm = T)
+    f0.mean2 = mean(df.mean$f0[(interval[1]+1):interval[2]], na.rm = T)
+    f0.mean3 = mean(df.mean$f0[(interval[2]+1):interval[3]], na.rm = T)
+    
+    logf0.mean1 = mean(df.mean$logf0[1:interval[1]], na.rm = T)
+    logf0.mean2 = mean(df.mean$logf0[(interval[1]+1):interval[2]], na.rm = T)
+    logf0.mean3 = mean(df.mean$logf0[(interval[2]+1):interval[3]], na.rm = T)
+    
+    h1h2.mean1 = mean(df.mean$h1h2c[1:interval[1]], na.rm = T)
+    h1h2.mean2 = mean(df.mean$h1h2c[(interval[1]+1):interval[2]], na.rm = T)
+    h1h2.mean3 = mean(df.mean$h1h2c[(interval[2]+1):interval[3]], na.rm = T)
+    
+    hnr.mean1 = mean(df.mean$hnr[1:interval[1]], na.rm = T)
+    hnr.mean2 = mean(df.mean$hnr[(interval[1]+1):interval[2]], na.rm = T)
+    hnr.mean3 = mean(df.mean$hnr[(interval[2]+1):interval[3]], na.rm = T)
+    
+    
+    energy.mean1 = mean(df.mean$energy[1:interval[1]], na.rm = T)
+    energy.mean2 = mean(df.mean$energy[(interval[1]+1):interval[2]], na.rm = T)
+    energy.mean3 = mean(df.mean$energy[(interval[2]+1):interval[3]], na.rm = T)
+    
+    f0.mean.z1 = mean(df.mean$f0z[1:interval[1]], na.rm = T)
+    f0.mean.z2 = mean(df.mean$f0z[(interval[1]+1):interval[2]], na.rm = T)
+    f0.mean.z3 = mean(df.mean$f0z[(interval[2]+1):interval[3]], na.rm = T)
+    
+    h1h2.mean.z1 = mean(df.mean$h1h2cz[1:interval[1]], na.rm = T)
+    h1h2.mean.z2 = mean(df.mean$h1h2cz[(interval[1]+1):interval[2]], na.rm = T)
+    h1h2.mean.z3 = mean(df.mean$h1h2cz[(interval[2]+1):interval[3]], na.rm = T)
+    
+    
+    hnr.mean.z1 = mean(df.mean$hnrz[1:interval[1]], na.rm = T)
+    hnr.mean.z2 = mean(df.mean$hnrz[(interval[1]+1):interval[2]], na.rm = T)
+    hnr.mean.z3 = mean(df.mean$hnrz[(interval[2]+1):interval[3]], na.rm = T)
+    
+    
+    df.mean.sub = data.frame(f0_001 = f0.mean1,
+                             f0_002 = f0.mean2,
+                             f0_003 = f0.mean3,
+                             logf0_001 = logf0.mean1,
+                             logf0_002 = logf0.mean2,
+                             logf0_003 = logf0.mean3,
+                             
+                             f0z_001 = f0.mean.z1,
+                             f0z_002 = f0.mean.z2,
+                             f0z_003 = f0.mean.z3,
+                             h1h2z_001 = h1h2.mean.z1,
+                             h1h2z_002 = h1h2.mean.z2,
+                             h1h2z_003 = h1h2.mean.z3,
+                             hnrz_001 = hnr.mean.z1,
+                             hnrz_002 = hnr.mean.z2,
+                             hnrz_003 = hnr.mean.z3,
+                             durationz = df.mean$durationz[1],
+                             subject = j, 
+                             filen = str_sub(df.mean$filen[1]),
+                             type = df.mean$type[1],
+                             tone = df.mean$tone[1],
+                             fileunique = i,
+                             formant_outlier = df.mean$formant_outlier[1],
+                             f0_trackerror = df.mean$f0_trackerror[1])                         
+                             
+    df.3p.wide = rbind(df.3p.wide, df.mean.sub)
+  }
+}
 
-df0 = dfsub.mean.cite %>% filter(!is.na(f0z))
 
-#View(dfsub.mean.cite %>% 
-# group_by(tone, time) %>% 
-#   summarize(n = n())) 
+
+#View(df.3p.wide %>%
+#filter(type == "sandhi") %>%
+#group_by(tone)%>%
+#summarise(n=n()))
 
 
 ```
 
 
+### Experiment I figures
+
+
 ### Figures
 
 ```{r}
+dfsub.mean.cite = df.9p %>% filter(type == "cite")
+subjectset = levels(as.factor(dfsub.mean.cite$subject))
+
 df.sub.mean.cite.semi = NULL
 
 for (j in subjectset) {
@@ -426,7 +1221,7 @@ for (j in subjectset) {
 ```
 
 
-
+### F0
 
 ```{r}
 
@@ -479,10 +1274,181 @@ check_smooth_f0.st = df.sub.mean.cite.semi %>%
 ggsave(check_smooth_f0, file = "D:/Research/languages/graph/F0_st_cite.tiff", width=5, height=3, units = 'in', bg = "transparent")
 
 
+check_smooth_f0 = dfsub.mean.cite %>%
+  ggplot(aes(x = time, y = f0z, color = tone.value, linetype = tone.value)) +
+  geom_smooth(method = loess, se = T, size = 1, alpha = 0.1) +
+  scale_colour_manual(values=c('#a6cee3','#1f78b4','#66c2a5','#8da0cb','#5e3c99','#b2df8a','#fc8d62'))+
+  scale_linetype_manual(values=c(1,1,1,1,1,2,2)) +  
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+  xlab("Time (normalized)")+ 
+  ylab("Mean F0 (st)")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(breaks = seq(1, 9,1))+
+  theme(plot.title = element_text(size = 5, hjust = 0.5))+
+  theme(axis.title.x = element_text(size=10))+
+  theme(axis.title.y = element_text(size=10))+
+  theme(axis.text.x = element_text(size = 10))+
+  theme(axis.text.y = element_text(size =10))+
+  theme(strip.text.y = element_text(size = 10))+
+  theme(strip.text.x = element_text(size = 10))+
+  theme(plot.caption = element_text(hjust=0, size=rel(2.3)))+
+  labs(color = "Tone")+
+  labs(linetype = "Tone") +
+  guides(color=guide_legend(override.aes=list(fill=NA)))+
+  theme(legend.title = element_text(size = 10),
+        legend.text = element_text(size = 10))+
+  theme(text=element_text(family="Palatino Linotype"))
+
+
+ggsave(check_smooth_f0, file = "D:/Research/languages/graph/F0_st_cite.tiff", width=5, height=3, units = 'in', bg = "transparent")
+
 
 ggsave(check_smooth_f0.st, file = "D:/Research/languages/graph/F0_st_cite.pdf", device = cairo_pdf, width=5, height=3, units = 'in', bg = "transparent")
 
 ```
+
+
+### Try Chao 5 scale conversion
+
+```{r}
+#(lgx - lg(min-SDmin)/ lg(max+SDmax)-lg(min-SDmin)) * 5
+dfsub.mean.cite = dfsub.mean.cite %>% mutate(gender = ifelse(subject %in% c("df1","df3","df5","df9"), "f", "m"))
+
+View(dfsub.mean.cite %>% filter(gender == "m" & time == 9 & f0 > 124 & tone == 2))
+
+View(dfsub.mean.cite %>% filter(subject == "df4" & filen == 11))
+
+
+df.sub.mean.cite.chaosummary.gender = dfsub.mean.cite %>% group_by(tone.value, time, gender) %>%
+  dplyr::summarise(mean = mean(f0, na.rm = T),
+                   sd = sd(f0, na.rm = T)) %>%
+  ungroup()
+
+df.sub.mean.cite.chaosummary.gender = df.sub.mean.cite.chaosummary.gender %>% group_by(gender) %>%
+  mutate(maxf0 = max(mean),
+         minf0 = min(mean)) %>% ungroup()
+
+df.sub.mean.cite.chaosummary.gender$chao_value = ((log10(df.sub.mean.cite.chaosummary.gender$mean) - log10(df.sub.mean.cite.chaosummary.gender$minf0)) / (log10(df.sub.mean.cite.chaosummary.gender$maxf0) - log10(df.sub.mean.cite.chaosummary.gender$minf0))) * 5
+
+
+
+f0.female = df.sub.mean.cite.chaosummary.gender %>% filter(gender == "f") %>%
+  ggplot(aes(x = time, y = chao_value, color = tone.value, linetype = tone.value, group = tone.value)) +
+  geom_line(size = 1) +
+  scale_colour_manual(values=c('#a6cee3','#1f78b4','#66c2a5','#8da0cb','#5e3c99','#b2df8a','#fc8d62'))+
+  scale_linetype_manual(values=c(1,1,1,1,1,2,2)) +  
+  theme_bw()+
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank())+
+  xlab("Time (normalized)")+ 
+  ylab("Mean F0 (st)")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(breaks = seq(1, 9,1))+
+  theme(plot.title = element_text(size = 5, hjust = 0.5))+
+  theme(axis.title.x = element_text(size=10))+
+  theme(axis.title.y = element_text(size=10))+
+  theme(axis.text.x = element_text(size = 10))+
+  theme(axis.text.y = element_text(size =10))+
+  theme(strip.text.y = element_text(size = 10))+
+  theme(strip.text.x = element_text(size = 10))+
+  theme(plot.caption = element_text(hjust=0, size=rel(2.3)))+
+  scale_y_continuous(limits = c(0, 5), breaks = seq(1, 5, by = 1))+
+  labs(color = "Tone")+
+  labs(linetype = "Tone") +
+  guides(color=guide_legend(override.aes=list(fill=NA)))+
+  theme(legend.title = element_text(size = 10),
+        legend.text = element_text(size = 10))+
+  theme(text=element_text(family="Palatino Linotype"))
+
+f0.male = df.sub.mean.cite.chaosummary.gender %>% filter(gender == "m") %>%
+  ggplot(aes(x = time, y = chao_value, color = tone.value, linetype = tone.value, group = tone.value)) +
+  geom_line(size = 1) +
+  scale_colour_manual(values=c('#a6cee3','#1f78b4','#66c2a5','#8da0cb','#5e3c99','#b2df8a','#fc8d62'))+
+  scale_linetype_manual(values=c(1,1,1,1,1,2,2)) +  
+  theme_bw()+
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank())+
+  xlab("Time (normalized)")+ 
+  ylab("Mean F0 (st)")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(breaks = seq(1, 9,1))+
+  theme(plot.title = element_text(size = 5, hjust = 0.5))+
+  theme(axis.title.x = element_text(size=10))+
+  theme(axis.title.y = element_text(size=10))+
+  theme(axis.text.x = element_text(size = 10))+
+  theme(axis.text.y = element_text(size =10))+
+  theme(strip.text.y = element_text(size = 10))+
+  theme(strip.text.x = element_text(size = 10))+
+  theme(plot.caption = element_text(hjust=0, size=rel(2.3)))+
+  scale_y_continuous(limits = c(0, 5), breaks = seq(1, 5, by = 1))+
+  labs(color = "Tone")+
+  labs(linetype = "Tone") +
+  guides(color=guide_legend(override.aes=list(fill=NA)))+
+  theme(legend.title = element_text(size = 10),
+        legend.text = element_text(size = 10))+
+  theme(text=element_text(family="Palatino Linotype"))
+
+
+df.sub.mean.cite.chaosummary.gender = df.sub.mean.cite.chaosummary.gender %>% group_by(time, tone.value) %>%
+  mutate(mean.chao_value = mean(chao_value)) %>%
+    ungroup()
+
+# not by gender
+
+
+df.sub.mean.cite.chaosummary = dfsub.mean.cite %>% group_by(tone.value, time) %>%
+  dplyr::summarise(mean = mean(f0, na.rm = T),
+                   sd = sd(f0, na.rm = T)) %>%
+  ungroup()
+
+df.sub.mean.cite.chaosummary = df.sub.mean.cite.chaosummary %>%
+  mutate(maxf0 = max(mean),
+         minf0 = min(mean),
+         minsd = min(sd),
+         maxsd = max(sd)) %>% ungroup()
+
+
+
+
+
+
+f0.track = df.sub.mean.cite.chaosummary.gender %>%
+  ggplot(aes(x = time, y = mean.chao_value, color = tone.value, linetype = tone.value, group = tone.value)) +
+  geom_line(size = 1) +
+  scale_colour_manual(values=c('#a6cee3','#1f78b4','#66c2a5','#8da0cb','#5e3c99','#b2df8a','#fc8d62'))+
+  scale_linetype_manual(values=c(1,1,1,1,1,2,2)) +  
+  theme_bw()+
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank())+
+  xlab("Time (normalized)")+ 
+  ylab("Mean F0 (st)")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(breaks = seq(1, 9,1))+
+  theme(plot.title = element_text(size = 5, hjust = 0.5))+
+  theme(axis.title.x = element_text(size=10))+
+  theme(axis.title.y = element_text(size=10))+
+  theme(axis.text.x = element_text(size = 10))+
+  theme(axis.text.y = element_text(size =10))+
+  theme(strip.text.y = element_text(size = 10))+
+  theme(strip.text.x = element_text(size = 10))+
+  theme(plot.caption = element_text(hjust=0, size=rel(2.3)))+
+  scale_y_continuous(limits = c(0, 5), breaks = seq(1, 5, by = 1))+
+  labs(color = "Tone")+
+  labs(linetype = "Tone") +
+  guides(color=guide_legend(override.aes=list(fill=NA)))+
+  theme(legend.title = element_text(size = 10),
+        legend.text = element_text(size = 10))+
+  theme(text=element_text(family="Palatino Linotype"))
+
+ggarrange(f0.female, f0.male, f0.track, ncol = 3, nrow = 1, common.legend = T)
+
+
+```
+
+
+
 
 
 ### H1H2
@@ -530,55 +1496,18 @@ ggsave(check_h1h2, file = "D:/Research/languages/graph/h1h2_cite.pdf", device = 
 
 ```
 
-### H1A3u
-
-
-```{r}
-
-check_h1a3u = dfsub.mean.cite %>%
-  ggplot(aes(x = time, y = h1a3u, color = tone.value, linetype = tone.value)) +
-  #  geom_line(stat='smooth', method = "loess", size = 1.5)+
-  #  geom_ribbon(stat='smooth', method = "loess", se=TRUE, alpha=0.1,
-  #              aes(color = NULL, group = factor(tone.value))) +
-  geom_smooth(method = loess, se = T, size = 1, alpha = 0.1) +
-  scale_colour_manual(values=c('#a6cee3','#1f78b4','#66c2a5','#8da0cb','#5e3c99','#b2df8a','#fc8d62'))+
-  scale_linetype_manual(values=c(1,1,1,1,1,2,2)) +  
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-  xlab("Time (normalized)")+ 
-  ylab("H1*-H2* (dB)")+
-  theme(plot.title = element_text(hjust = 0.5))+
-  scale_x_continuous(breaks = seq(1, 9,1))+
-  theme(plot.title = element_text(size = 10, hjust = 0.5))+
-  theme(axis.title.x = element_text(size=10))+
-  theme(axis.title.y = element_text(size=10))+
-  theme(axis.text.x = element_text(size = 10))+
-  theme(axis.text.y = element_text(size =10))+
-  theme(strip.text.y = element_text(size = 10))+
-  theme(strip.text.x = element_text(size = 10))+
-  theme(plot.caption = element_text(hjust=0, size=rel(2.3)))+
-  labs(color = "Tone")+
-  labs(linetype = "Tone")+
-  guides(color=guide_legend(override.aes=list(fill=NA)))+
-  theme(legend.title = element_text(size = 10),
-        legend.text = element_text(size = 10))+
-  theme(text=element_text(family="Palatino Linotype"))
-
-
-
-```
-
 
 
 
 ### HNR
 
 ```{r}
+df.9p.cite = df.9p %>% filter(type == "cite")
+unique(df.9p.cite$tone)
+View(df.9p.cite %>% filter(is.na(tone)))
 
-
-check_hnr = dfsub.mean.cite %>%
-  ggplot(aes(x = time, y = hnr, color = tone.value, linetype = tone.value)) +
+check_hnr = df.9p %>% filter(type == "cite") %>%
+  ggplot(aes(x = time, y = hnr, color = tone, linetype = tone)) +
   #  geom_line(stat='smooth', method = "loess", size = 1.5)+
   #  geom_ribbon(stat='smooth', method = "loess", se=TRUE, alpha=0.1,
   #              aes(color = NULL, group = factor(tone.value))) +
@@ -617,6 +1546,13 @@ ggsave(check_hnr, file = "D:/Research/languages/graph/hnr_cite.pdf", device = ca
 
 
 
+```
+
+
+### VQ ellipsis
+```{r}
+
+
 #ellipsis
 check_vq = dfsub.mean.cite %>%
   ggplot(aes(x = h1h2c, y = hnr, color = tone.value)) +
@@ -642,6 +1578,12 @@ check_vq = dfsub.mean.cite %>%
 
 ggsave(check_vq, file = "D:/Research/languages/graph/vq_cite.png", width=5, height=3, units = 'in', bg = "transparent")
 
+
+```
+
+
+### Duration
+```{r}
 
 #duration
 
@@ -676,488 +1618,36 @@ ggsave(check_dur, file = "D:/Research/languages/graph/dur_cite.pdf", device = ca
 
 
 
-
-```
-
-
-### Prepare sandhi data
-
-```{r}
-
-dfset = c("df1","df2", "df3","df4","df5","df6","df8","df9","df10","df11")
-
-
-df.sandhi = NULL
-for (i in dfset) {
-  j = get(i)
-  j = j %>%
-    mutate(subject = i)
-  df.sandhi = rbind(df.sandhi, j)
-  
-}
-
-
-df.sandhi = df.sandhi %>%
-  mutate(duration = seg_End - seg_Start) %>%
-  filter(!str_detect(Filename, "clip|corrupt|Clip"))
-df.sandhi$filen = str_sub(df.sandhi$Filename,1,-6)
-
-
-df.sandhi = df.sandhi %>%
-  mutate(filen = as.numeric(filen)) %>%
-  filter(filen %in% df_meta$filen) %>%
-  mutate(filen = as.numeric(filen)) %>%
-  mutate(file_sub = paste(subject, Filename,sep = "-"))
-
-length(unique(df.sandhi$file_sub))  
-
-# length(unique(df.sandhi$filen))
-
-
-df.full.sandhi = df.sandhi %>%
-  dplyr::select(Filename,segment,tone,environment,sandhi,rep,seg_Start,seg_End,t_ms,file_sub,
-                H1H2c,Energy,HNR05,strF0,soe,subject,duration,filen)%>%
-  dplyr::rename(h1h2c=H1H2c,hnr=HNR05,f0=strF0,energy=Energy)
-
-
-nrow(df.full.sandhi %>% filter(f0 == "NaN"))
-nrow(df.full.sandhi %>% filter(h1h2c == "NaN"))
-nrow(df.full.sandhi %>% filter(hnr == "NaN"))
-
-# filter out tokens where energy = 0 and log transform energy
-nrow(df.full.sandhi %>% filter(energy == 0))
-  
-df.full.sandhi$f0[df.full.sandhi$energy == 0] <- "NA"
-df.full.sandhi$h1h2c[df.full.sandhi$energy == 0] <- "NA"
-df.full.sandhi$hnr[df.full.sandhi$energy == 0] <- "NA"
-  
-df.full.sandhi = df.full.sandhi %>%
-  mutate(f0 = as.numeric(f0),
-         h1h2c = as.numeric(h1h2c),
-         hnr = as.numeric(hnr))
-
-#f0 outlier
-df.full.sandhi$f0upper <- ave(df.full.sandhi$f0, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T) + 3 * sd(x, na.rm = T))
-df.full.sandhi$f0lower <- ave(df.full.sandhi$f0, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T) - 3 * sd(x, na.rm = T))
-df.full.sandhi$f0outlier[df.full.sandhi$f0 > df.full.sandhi$f0upper] <- "outlier"
-df.full.sandhi$f0outlier[df.full.sandhi$f0 < df.full.sandhi$f0lower] <- "outlier"
-
-
-
-
-
-#h1h2c outlier
-
-df.full.sandhi$h1h2c[df.full.sandhi$f0outlier == "outlier"] <- "NA"
-df.full.sandhi$h1h2c = as.numeric(df.full.sandhi$h1h2c)
-
-df.full.sandhi$h1h2cupper <- ave(df.full.sandhi$h1h2c, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T) + 3 * sd(x, na.rm = T))
-df.full.sandhi$h1h2clower <- ave(df.full.sandhi$h1h2c, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T) - 3 * sd(x, na.rm = T))
-df.full.sandhi$h1h2coutlier[df.full.sandhi$h1h2c > df.full.sandhi$h1h2cupper] <- "outlier"
-df.full.sandhi$h1h2coutlier[df.full.sandhi$h1h2c < df.full.sandhi$h1h2clower] <- "outlier"
-
-
-#hnr outlier
-df.full.sandhi$hnrupper <- ave(df.full.sandhi$hnr, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T) + 3 * sd(x, na.rm = T))
-df.full.sandhi$hnrlower <- ave(df.full.sandhi$hnr, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T) - 3 * sd(x, na.rm = T))
-df.full.sandhi$hnroutlier[df.full.sandhi$hnr > df.full.sandhi$hnrupper] <- "outlier"
-df.full.sandhi$hnroutlier[df.full.sandhi$hnr < df.full.sandhi$hnrlower] <- "outlier"
-
-
-#write z score
-#F0
-df.full.sandhi$f0mean <- ave(df.full.sandhi$f0, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T))
-df.full.sandhi$f0sd <- ave(df.full.sandhi$f0, df.full.sandhi$subject, FUN = function(x) sd(x, na.rm = T))
-df.full.sandhi$f0z <- (df.full.sandhi$f0 - df.full.sandhi$f0mean) / df.full.sandhi$f0sd
-df.full.sandhi$f0z[df.full.sandhi$f0outlier == "outlier"] <- "NA"
-df.full.sandhi$f0[df.full.sandhi$f0outlier == "outlier"] <- "NA"
-
-
-#H1H2c
-
-
-df.full.sandhi$h1h2cmean <- ave(df.full.sandhi$h1h2c, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T))
-df.full.sandhi$h1h2csd <- ave(df.full.sandhi$h1h2c, df.full.sandhi$subject, FUN = function(x) sd(x, na.rm = T))
-df.full.sandhi$h1h2cz <- (df.full.sandhi$h1h2c - df.full.sandhi$h1h2cmean) / df.full.sandhi$h1h2csd
-df.full.sandhi$h1h2cz[df.full.sandhi$h1h2coutlier == "outlier"] <- "NA"
-df.full.sandhi$h1h2c[df.full.sandhi$h1h2c == "outlier"] <- "NA"
-
-
-
-
-#hnr
-
-df.full.sandhi$hnrmean <- ave(df.full.sandhi$hnr, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T))
-df.full.sandhi$hnrsd <- ave(df.full.sandhi$hnr, df.full.sandhi$subject, FUN = function(x) sd(x, na.rm = T))
-df.full.sandhi$hnrz <- (df.full.sandhi$hnr - df.full.sandhi$hnrmean) / df.full.sandhi$hnrsd
-df.full.sandhi$hnrz[df.full.sandhi$hnroutlier == "outlier"] <- "NA"
-df.full.sandhi$hnr[df.full.sandhi$hnroutlier == "outlier"] <- "NA"
-
-
-#duration
-
-df.full.sandhi$durationmean <- ave(df.full.sandhi$duration, df.full.sandhi$subject, FUN = function(x) mean(x, na.rm = T))
-df.full.sandhi$durationsd <- ave(df.full.sandhi$duration, df.full.sandhi$subject, FUN = function(x) sd(x, na.rm = T))
-df.full.sandhi$durationz <- (df.full.sandhi$duration - df.full.sandhi$durationmean) / df.full.sandhi$durationsd
-
-
-
-
-df.full.sandhi <- df.full.sandhi %>%
-  mutate(f0z = as.numeric(f0z), 
-         h1h2cz = as.numeric(h1h2cz),
-         hnrz = as.numeric(hnrz),
-         t_ms = as.numeric(t_ms),
-         h1h2c = as.numeric(h1h2c),
-         durationz = as.numeric(durationz),
-         f0 = as.numeric(f0),
-         hnr = as.numeric(hnr))
-
-
-
-#nrow(df.full.sandhi %>% filter(f0outlier == "outlier"))
-#nrow(df.full.sandhi %>% filter(h1h2coutlier == "outlier"))
-#nrow(df.full.sandhi %>% filter(hnroutlier == "outlier"))
-
-#nrow(df.full.sandhi %>% filter(!is.na(f0z)))
-#nrow(df.full.sandhi %>% filter(!is.na(h1h2cz)))
-#nrow(df.full.sandhi %>% filter(!is.na(hnrz)))
-
-
-df0 = df.full.sandhi %>% filter(!is.na(f0z))
-dh1h2 = df.full.sandhi %>% filter(!is.na(h1h2cz))
-dhnr = df.full.sandhi %>% filter(!is.na(hnrz))
-
-#length(unique(df0$file_sub))
-#length(unique(dh1h2$file_sub))
-#length(unique(dhnr$file_sub))
-
-
-
-#Divide into 9 intervals
-
-subjectset = levels(as.factor(df.full.sandhi$subject))
-
-dfsub.mean.sandhi = NULL
-
-for (j in subjectset) {
-  dfsub = df.full.sandhi %>%
-    filter(subject == j)
-  nameset = unique(droplevels(dfsub)$Filename)
-  for (i in nameset) {
-    df.mean = dfsub %>%
-      filter(Filename == i)
-    interval = round(quantile(c(1:nrow(df.mean)),c(1/9, 2/9, 3/9, 4/9, 5/9, 6/9, 7/9, 8/9, 1)),0)
-    
-    f0.mean1 = mean(df.mean$f0[1:interval[1]], na.rm = T)
-    f0.mean2 = mean(df.mean$f0[(interval[1]+1):interval[2]], na.rm = T)
-    f0.mean3 = mean(df.mean$f0[(interval[2]+1):interval[3]], na.rm = T)
-    f0.mean4 = mean(df.mean$f0[(interval[3]+1):interval[4]], na.rm = T)
-    f0.mean5 = mean(df.mean$f0[(interval[4]+1):interval[5]], na.rm = T)
-    f0.mean6 = mean(df.mean$f0[(interval[5]+1):interval[6]], na.rm = T)
-    f0.mean7 = mean(df.mean$f0[(interval[6]+1):interval[7]], na.rm = T)
-    f0.mean8 = mean(df.mean$f0[(interval[7]+1):interval[8]], na.rm = T)
-    f0.mean9 = mean(df.mean$f0[(interval[8]+1):interval[9]], na.rm = T)
-    
-    h1h2.mean1 = mean(df.mean$h1h2c[1:interval[1]], na.rm = T)
-    h1h2.mean2 = mean(df.mean$h1h2c[(interval[1]+1):interval[2]], na.rm = T)
-    h1h2.mean3 = mean(df.mean$h1h2c[(interval[2]+1):interval[3]], na.rm = T)
-    h1h2.mean4 = mean(df.mean$h1h2c[(interval[3]+1):interval[4]], na.rm = T)
-    h1h2.mean5 = mean(df.mean$h1h2c[(interval[4]+1):interval[5]], na.rm = T)
-    h1h2.mean6 = mean(df.mean$h1h2c[(interval[5]+1):interval[6]], na.rm = T)
-    h1h2.mean7 = mean(df.mean$h1h2c[(interval[6]+1):interval[7]], na.rm = T)
-    h1h2.mean8 = mean(df.mean$h1h2c[(interval[7]+1):interval[8]], na.rm = T)
-    h1h2.mean9 = mean(df.mean$h1h2c[(interval[8]+1):interval[9]], na.rm = T)
-    
-    hnr.mean1 = mean(df.mean$hnr[1:interval[1]], na.rm = T)
-    hnr.mean2 = mean(df.mean$hnr[(interval[1]+1):interval[2]], na.rm = T)
-    hnr.mean3 = mean(df.mean$hnr[(interval[2]+1):interval[3]], na.rm = T)
-    hnr.mean4 = mean(df.mean$hnr[(interval[3]+1):interval[4]], na.rm = T)
-    hnr.mean5 = mean(df.mean$hnr[(interval[4]+1):interval[5]], na.rm = T)
-    hnr.mean6 = mean(df.mean$hnr[(interval[5]+1):interval[6]], na.rm = T)
-    hnr.mean7 = mean(df.mean$hnr[(interval[6]+1):interval[7]], na.rm = T)
-    hnr.mean8 = mean(df.mean$hnr[(interval[7]+1):interval[8]], na.rm = T)
-    hnr.mean9 = mean(df.mean$hnr[(interval[8]+1):interval[9]], na.rm = T)
-    
-    
-    energy.mean1 = mean(df.mean$energy[1:interval[1]], na.rm = T)
-    energy.mean2 = mean(df.mean$energy[(interval[1]+1):interval[2]], na.rm = T)
-    energy.mean3 = mean(df.mean$energy[(interval[2]+1):interval[3]], na.rm = T)
-    energy.mean4 = mean(df.mean$energy[(interval[3]+1):interval[4]], na.rm = T)
-    energy.mean5 = mean(df.mean$energy[(interval[4]+1):interval[5]], na.rm = T)
-    energy.mean6 = mean(df.mean$energy[(interval[5]+1):interval[6]], na.rm = T)
-    energy.mean7 = mean(df.mean$energy[(interval[6]+1):interval[7]], na.rm = T)
-    energy.mean8 = mean(df.mean$energy[(interval[7]+1):interval[8]], na.rm = T)
-    energy.mean9 = mean(df.mean$energy[(interval[8]+1):interval[9]], na.rm = T)
-    
-    f0.mean.z1 = mean(df.mean$f0z[1:interval[1]], na.rm = T)
-    f0.mean.z2 = mean(df.mean$f0z[(interval[1]+1):interval[2]], na.rm = T)
-    f0.mean.z3 = mean(df.mean$f0z[(interval[2]+1):interval[3]], na.rm = T)
-    f0.mean.z4 = mean(df.mean$f0z[(interval[3]+1):interval[4]], na.rm = T)
-    f0.mean.z5 = mean(df.mean$f0z[(interval[4]+1):interval[5]], na.rm = T)
-    f0.mean.z6 = mean(df.mean$f0z[(interval[5]+1):interval[6]], na.rm = T)
-    f0.mean.z7 = mean(df.mean$f0z[(interval[6]+1):interval[7]], na.rm = T)
-    f0.mean.z8 = mean(df.mean$f0z[(interval[7]+1):interval[8]], na.rm = T)
-    f0.mean.z9 = mean(df.mean$f0z[(interval[8]+1):interval[9]], na.rm = T)
-    
-    h1h2.mean.z1 = mean(df.mean$h1h2cz[1:interval[1]], na.rm = T)
-    h1h2.mean.z2 = mean(df.mean$h1h2cz[(interval[1]+1):interval[2]], na.rm = T)
-    h1h2.mean.z3 = mean(df.mean$h1h2cz[(interval[2]+1):interval[3]], na.rm = T)
-    h1h2.mean.z4 = mean(df.mean$h1h2cz[(interval[3]+1):interval[4]], na.rm = T)
-    h1h2.mean.z5 = mean(df.mean$h1h2cz[(interval[4]+1):interval[5]], na.rm = T)
-    h1h2.mean.z6 = mean(df.mean$h1h2cz[(interval[5]+1):interval[6]], na.rm = T)
-    h1h2.mean.z7 = mean(df.mean$h1h2cz[(interval[6]+1):interval[7]], na.rm = T)
-    h1h2.mean.z8 = mean(df.mean$h1h2cz[(interval[7]+1):interval[8]], na.rm = T)
-    h1h2.mean.z9 = mean(df.mean$h1h2cz[(interval[8]+1):interval[9]], na.rm = T)
-    
-    
-    hnr.mean.z1 = mean(df.mean$hnrz[1:interval[1]], na.rm = T)
-    hnr.mean.z2 = mean(df.mean$hnrz[(interval[1]+1):interval[2]], na.rm = T)
-    hnr.mean.z3 = mean(df.mean$hnrz[(interval[2]+1):interval[3]], na.rm = T)
-    hnr.mean.z4 = mean(df.mean$hnrz[(interval[3]+1):interval[4]], na.rm = T)
-    hnr.mean.z5 = mean(df.mean$hnrz[(interval[4]+1):interval[5]], na.rm = T)
-    hnr.mean.z6 = mean(df.mean$hnrz[(interval[5]+1):interval[6]], na.rm = T)
-    hnr.mean.z7 = mean(df.mean$hnrz[(interval[6]+1):interval[7]], na.rm = T)
-    hnr.mean.z8 = mean(df.mean$hnrz[(interval[7]+1):interval[8]], na.rm = T)
-    hnr.mean.z9 = mean(df.mean$hnrz[(interval[8]+1):interval[9]], na.rm = T)
-    
-    
-    
-    
-    df.mean.sub = data.frame(f0z = c(f0.mean.z1, f0.mean.z2, f0.mean.z3,
-                                     f0.mean.z4, f0.mean.z5, f0.mean.z6,
-                                     f0.mean.z7, f0.mean.z8, f0.mean.z9),
-                             hnrz = c(hnr.mean.z1, hnr.mean.z2, hnr.mean.z3,
-                                     hnr.mean.z4, hnr.mean.z5, hnr.mean.z6,
-                                     hnr.mean.z7, hnr.mean.z8, hnr.mean.z9),
-                             f0 = c(f0.mean1, f0.mean2, f0.mean3,
-                                    f0.mean4, f0.mean5, f0.mean6,
-                                    f0.mean7, f0.mean8, f0.mean9),
-                             h1h2cz = c(h1h2.mean.z1, h1h2.mean.z2, h1h2.mean.z3,
-                                        h1h2.mean.z4, h1h2.mean.z5, h1h2.mean.z6,
-                                        h1h2.mean.z7, h1h2.mean.z8, h1h2.mean.z9),
-                                        h1h2c = c(h1h2.mean1, h1h2.mean2, h1h2.mean3,
-                                        h1h2.mean4, h1h2.mean5, h1h2.mean6,
-                                        h1h2.mean7, h1h2.mean8, h1h2.mean9),
-                             hnr = c(hnr.mean1, hnr.mean2, hnr.mean3,
-                                     hnr.mean4, hnr.mean5, hnr.mean6,
-                                     hnr.mean7, hnr.mean8, hnr.mean9),
-                             durationz = df.mean$durationz[1],
-                             duration = df.mean$duration[1],
-                             subject = j, 
-                             filen = str_sub(df.mean$Filename[1],1,-6),
-                             filename = df.mean$Filename[1],
-                             tone = df.mean$tone[1],
-                             time = c(1:9),
-                             type = "sandhi")
-    dfsub.mean.sandhi = rbind(dfsub.mean.sandhi, df.mean.sub)
-  }
-}
-
-#nrow(dfsub.mean.sandhi %>% filter(!is.na(f0z)))
-#nrow(dfsub.mean.sandhi %>% filter(!is.na(h1h2cz)))
-#nrow(dfsub.mean.sandhi %>% filter(!is.na(hnrz)))
-
-
-#View(dfsub.mean.sandhi %>% 
-# group_by(tone, time) %>% 
-#   summarize(n = n())) 
-
-
-df.female = dfsub.mean.sandhi %>% filter(subject %in% c("df1", "df3", "df5", "df9", "df11") & tone %in% c(42, 35, 5))
-
-#View(df.female %>% group_by(tone) %>% 
-#      summarise(meanf0 = mean(f0, na.rm = T),
-#                meandur = mean(duration, na.rm = T)))
-                
-
-df.female = dfsub.mean.sandhi %>% filter(subject %in% c("df2", "df4", "df6", "df8", "df10") & tone %in% c(42, 35, 5, 2))
-
-#View(df.female %>% group_by(tone) %>% 
-#      summarise(meanf0 = mean(f0, na.rm = T),
-#                meandur = mean(duration, na.rm = T)))                
-                
-
-```
-
-### Make 9-point version
-
-```{r}
-
-dfsub.mean.cite = dfsub.mean.cite %>%
-                      dplyr::select(-tone.value)
-
-
-df.9p = rbind(dfsub.mean.cite, dfsub.mean.sandhi)
-            
 ```
 
 
 
-
-
-
-
-### Make 3-point version
+### Vowel plot
 
 ```{r}
-            
-
-df.full.cite = df.full.cite %>%
-                  mutate(type = "cite")
-df.full.sandhi = df.full.sandhi %>%
-                  mutate(type = "sandhi")
-df.full = rbind(df.full.cite, df.full.sandhi) %>%
-            mutate(fileunique = paste(Filename, type, sep = "-"))
-            
-            
-subjectset = levels(as.factor(df.full$subject))
-
-dfsub.mean = NULL
-
-for (j in subjectset) {
-  dfsub = df.full %>%
-    filter(subject == j)
-  nameset = unique(droplevels(dfsub)$fileunique)
-  for (i in nameset) {
-    df.mean = dfsub %>%
-      filter(fileunique == i)
-    interval = round(quantile(c(1:nrow(df.mean)),c(1/3, 2/3, 1)),0)
-    
-    f0.mean1 = mean(df.mean$f0[1:interval[1]], na.rm = T)
-    f0.mean2 = mean(df.mean$f0[(interval[1]+1):interval[2]], na.rm = T)
-    f0.mean3 = mean(df.mean$f0[(interval[2]+1):interval[3]], na.rm = T)
-    
-    h1h2.mean1 = mean(df.mean$h1h2c[1:interval[1]], na.rm = T)
-    h1h2.mean2 = mean(df.mean$h1h2c[(interval[1]+1):interval[2]], na.rm = T)
-    h1h2.mean3 = mean(df.mean$h1h2c[(interval[2]+1):interval[3]], na.rm = T)
-    
-    hnr.mean1 = mean(df.mean$hnr[1:interval[1]], na.rm = T)
-    hnr.mean2 = mean(df.mean$hnr[(interval[1]+1):interval[2]], na.rm = T)
-    hnr.mean3 = mean(df.mean$hnr[(interval[2]+1):interval[3]], na.rm = T)
-    
-    
-    energy.mean1 = mean(df.mean$energy[1:interval[1]], na.rm = T)
-    energy.mean2 = mean(df.mean$energy[(interval[1]+1):interval[2]], na.rm = T)
-    energy.mean3 = mean(df.mean$energy[(interval[2]+1):interval[3]], na.rm = T)
-    
-    f0.mean.z1 = mean(df.mean$f0z[1:interval[1]], na.rm = T)
-    f0.mean.z2 = mean(df.mean$f0z[(interval[1]+1):interval[2]], na.rm = T)
-    f0.mean.z3 = mean(df.mean$f0z[(interval[2]+1):interval[3]], na.rm = T)
-    
-    h1h2.mean.z1 = mean(df.mean$h1h2cz[1:interval[1]], na.rm = T)
-    h1h2.mean.z2 = mean(df.mean$h1h2cz[(interval[1]+1):interval[2]], na.rm = T)
-    h1h2.mean.z3 = mean(df.mean$h1h2cz[(interval[2]+1):interval[3]], na.rm = T)
-    
-    
-    hnr.mean.z1 = mean(df.mean$hnrz[1:interval[1]], na.rm = T)
-    hnr.mean.z2 = mean(df.mean$hnrz[(interval[1]+1):interval[2]], na.rm = T)
-    hnr.mean.z3 = mean(df.mean$hnrz[(interval[2]+1):interval[3]], na.rm = T)
-    
-    
-    
-    
-    df.mean.sub = data.frame(f0z = c(f0.mean.z1, f0.mean.z2, f0.mean.z3),
-                             hnrz = c(hnr.mean.z1, hnr.mean.z2, hnr.mean.z3),
-                             f0 = c(f0.mean1, f0.mean2, f0.mean3),
-                             h1h2cz = c(h1h2.mean.z1, h1h2.mean.z2, h1h2.mean.z3),
-                             durationz = df.mean$durationz[1],
-                             subject = j, 
-                             filen = str_sub(df.mean$Filename[1],1,-6),
-                             filename = df.mean$Filename[1],
-                             tone = df.mean$tone[1],
-                             time = c(1:3),
-                             type = df.mean$type[1],
-                             fileunique = i)
-    dfsub.mean = rbind(dfsub.mean, df.mean.sub)
-  }
-}
+dfsub.mean.cite.midformant = dfsub.mean.cite %>% 
+  filter(time %in% c(4,5,6)) %>%
+  group_by(subject, filen) %>%
+  mutate(midf1 = mean(f1),
+         midf2 = mean(f2)) %>%
+  ungroup() %>%
+  dplyr::select(subject, filen, vowel, midf1, midf2, tone, formant_outlier) %>%
+  unique()
 
 
-nrow(dfsub.mean %>% filter(!is.na(f0z) & type == "sandhi"))
-nrow(dfsub.mean %>% filter(!is.na(h1h2cz) & type == "sandhi"))
-nrow(dfsub.mean %>% filter(!is.na(hnrz) & type == "sandhi"))
+dfsub.mean.cite.midformant.forplot = dfsub.mean.cite.midformant %>% filter(nchar(vowel) == 1)
 
-
-df.3p = dfsub.mean
-
-
-# 3p wide version
-
-
-df.3p.wide = NULL
-
-for (j in subjectset) {
-  dfsub = df.full %>%
-    filter(subject == j)
-  nameset = unique(droplevels(dfsub)$fileunique)
-  for (i in nameset) {
-    df.mean = dfsub %>%
-      filter(fileunique == i)
-    interval = round(quantile(c(1:nrow(df.mean)),c(1/3, 2/3, 1)),0)
-    
-    f0.mean1 = mean(df.mean$f0[1:interval[1]], na.rm = T)
-    f0.mean2 = mean(df.mean$f0[(interval[1]+1):interval[2]], na.rm = T)
-    f0.mean3 = mean(df.mean$f0[(interval[2]+1):interval[3]], na.rm = T)
-    
-    h1h2.mean1 = mean(df.mean$h1h2c[1:interval[1]], na.rm = T)
-    h1h2.mean2 = mean(df.mean$h1h2c[(interval[1]+1):interval[2]], na.rm = T)
-    h1h2.mean3 = mean(df.mean$h1h2c[(interval[2]+1):interval[3]], na.rm = T)
-    
-    hnr.mean1 = mean(df.mean$hnr[1:interval[1]], na.rm = T)
-    hnr.mean2 = mean(df.mean$hnr[(interval[1]+1):interval[2]], na.rm = T)
-    hnr.mean3 = mean(df.mean$hnr[(interval[2]+1):interval[3]], na.rm = T)
-    
-    
-    energy.mean1 = mean(df.mean$energy[1:interval[1]], na.rm = T)
-    energy.mean2 = mean(df.mean$energy[(interval[1]+1):interval[2]], na.rm = T)
-    energy.mean3 = mean(df.mean$energy[(interval[2]+1):interval[3]], na.rm = T)
-    
-    f0.mean.z1 = mean(df.mean$f0z[1:interval[1]], na.rm = T)
-    f0.mean.z2 = mean(df.mean$f0z[(interval[1]+1):interval[2]], na.rm = T)
-    f0.mean.z3 = mean(df.mean$f0z[(interval[2]+1):interval[3]], na.rm = T)
-    
-    h1h2.mean.z1 = mean(df.mean$h1h2cz[1:interval[1]], na.rm = T)
-    h1h2.mean.z2 = mean(df.mean$h1h2cz[(interval[1]+1):interval[2]], na.rm = T)
-    h1h2.mean.z3 = mean(df.mean$h1h2cz[(interval[2]+1):interval[3]], na.rm = T)
-    
-    
-    hnr.mean.z1 = mean(df.mean$hnrz[1:interval[1]], na.rm = T)
-    hnr.mean.z2 = mean(df.mean$hnrz[(interval[1]+1):interval[2]], na.rm = T)
-    hnr.mean.z3 = mean(df.mean$hnrz[(interval[2]+1):interval[3]], na.rm = T)
-    
-    
-    df.mean.sub = data.frame(f0_001 = f0.mean1,
-                             f0_002 = f0.mean2,
-                             f0_003 = f0.mean3,
-                             
-                             f0z_001 = f0.mean.z1,
-                             f0z_002 = f0.mean.z2,
-                             f0z_003 = f0.mean.z3,
-                             h1h2z_001 = h1h2.mean.z1,
-                             h1h2z_002 = h1h2.mean.z2,
-                             h1h2z_003 = h1h2.mean.z3,
-                             hnrz_001 = hnr.mean.z1,
-                             hnrz_002 = hnr.mean.z2,
-                             hnrz_003 = hnr.mean.z3,
-                             durationz = df.mean$durationz[1],
-                             subject = j, 
-                             filen = str_sub(df.mean$Filename[1],1,-6),
-                             type = df.mean$type[1],
-                             tone = df.mean$tone[1],
-                             fileunique = i)                         
-                             
-    df.3p.wide = rbind(df.3p.wide, df.mean.sub)
-  }
-}
-
-
-
-#View(df.3p.wide %>%
-#filter(type == "sandhi") %>%
-#group_by(tone)%>%
-#summarise(n=n()))
-
+dfsub.mean.cite.midformant %>% 
+  filter(is.na(formant_outlier)) %>%
+  ggplot(aes(x = midf2, y = midf1)) +
+  geom_point(size = 0.6) +
+  #geom_text()+
+  facet_wrap(.~vowel)+
+  #geom_density_2d() +
+#  scale_color_manual(values=c('#a6611a','#dfc27d','#018571'))+
+  scale_y_reverse(limits = c(1500,0),position = "right") + 
+  scale_x_reverse(limits = c(3500,0),position = "top")+
+  theme_bw()
 
 ```
 
@@ -1349,7 +1839,7 @@ predict.23_44.sandhi = predict(lda_model.23_44.sandhi)$x %>% # not the good CV p
 
 #23_2
 
-
+df.3p.wide.sandhi.23_2 = df.3p.wide.sandhi.23_2 %>% filter(!filen %in% c(13, 14))
 lda_model.23_2.sandhi = lda(lda_formula, data = df.3p.wide.sandhi.23_2)
 lda_scores.23_2.sandhi = lda(lda_formula, data = df.3p.wide.sandhi.23_2, CV = TRUE)
 confusionMatrix(lda_scores.23_2.sandhi$class, df.3p.wide.sandhi.23_2$tone)
@@ -2285,7 +2775,55 @@ hnr.ref5 = lmer(hnrz ~ time.center4 + time2 + tone + time.center4*tone + time2*t
 summary(hnr.ref5)
 write.csv(as.data.frame(summary(hnr.ref5)$coefficient), "D:/Research/languages/stats/hnr_ref5.csv")
 
+df.9p.cite = df.9p %>% filter(type == "cite")
+df.9p.cite$hnr.predict <- predict(hnr.ref5, df.9p.cite, re.form = ~(1|subject))
 
+
+df.9p.cite$tone.value = paste("T",df.9p.cite$tone,sep = "")
+
+df.9p.cite = df.9p.cite %>%
+  mutate(tone.value= as.factor(tone.value))
+
+
+
+df.9p.cite$tone.value = factor(df.9p.cite$tone.value, levels = c("T44", "T23", "T42", "T35", "T11", "T5", "T2"))
+
+check_hnr_predict = df.9p.cite %>%
+  ggplot(aes(x = time, y = hnr.predict, color = tone.value, linetype = tone.value)) +
+  #  geom_line(stat='smooth', method = "loess", size = 1.5)+
+  #  geom_ribbon(stat='smooth', method = "loess", se=TRUE, alpha=0.1,
+  #              aes(color = NULL, group = factor(tone.value))) +
+  geom_smooth(method = loess, se = T, size = 1, alpha = 0.1) +
+  scale_colour_manual(values=c('#a6cee3','#1f78b4','#66c2a5','#8da0cb','#5e3c99','#b2df8a','#fc8d62'))+
+  scale_linetype_manual(values=c(1,1,1,1,1,2,2)) +  
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+  xlab("Time (normalized)")+ 
+  ylab("HNR predicted")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(breaks = seq(1, 9,1))+
+  theme(plot.title = element_text(size = 10, hjust = 0.5))+
+  theme(axis.title.x = element_text(size=10))+
+  theme(axis.title.y = element_text(size=10))+
+  theme(axis.text.x = element_text(size = 10))+
+  theme(axis.text.y = element_text(size =10))+
+  theme(strip.text.y = element_text(size = 10))+
+  theme(strip.text.x = element_text(size = 10))+
+  theme(plot.caption = element_text(hjust=0, size=rel(2.3)))+
+  labs(color = "Tone")+
+  labs(linetype = "Tone")+
+  guides(color=guide_legend(override.aes=list(fill=NA)))+
+  theme(legend.title = element_text(size = 10),
+        legend.text = element_text(size = 10))+
+  theme(text=element_text(family="Palatino Linotype"))
+
+
+
+check_hnr_predict_original = ggarrange(check_hnr, check_hnr_predict, nrow = 1 ,ncol = 2, common.legend = TRUE, legend = "right")
+
+
+ggsave(check_hnr_predict_original, filename = "D:/Research/languages/graph/check_hnr_predict_original.tiff", width=9, height=4, units = 'in', bg = "transparent")
 
 #tone 5 at point 4
 #-0.023 - 0.064*time
@@ -2338,6 +2876,9 @@ cite.san.h1h2 = lmer(h1h2c ~ tone + type + tone*type + (1|subject), df.55)
 summary(cite.san.h1h2)
 
 ```
+
+
+
 
 
 
@@ -2506,5 +3047,7 @@ ggsave(hnr.5, file = paste("D:/Research/languages/graph/hnrbyfile/",j,i,".png", 
 
 
 
+https://www.youtube.com/playlist?list=PLHX-GTSXulUS-5ozDHqU2ZR3gJyYPLmVf
 
+8-11
 
